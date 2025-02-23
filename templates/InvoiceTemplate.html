@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+    <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 40px; }
+          .header { margin-bottom: 30px; }
+          .invoice-details { margin-bottom: 30px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+          th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+          .total { text-align: right; margin-top: 20px; }
+          .company-details { margin-bottom: 20px; }
+          .payment-terms { margin-top: 30px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>INVOICE</h1>
+          <div class="company-details">
+            <strong><?= company.name ?></strong><br>
+            <?= company.address ?><br>
+            Email: <?= company.email ?><br>
+            Phone: <?= company.phone ?>
+          </div>
+          
+          <div class="client-details">
+            <strong>Bill To:</strong><br>
+            <?= contragent.companyName ?><br>
+            <?= contragent.address ?><br>
+            Email: <?= contragent.email ?><br>
+            Phone: <?= contragent.phone ?>
+          </div>
+        </div>
+        
+        <div class="invoice-details">
+          <strong>Invoice Number:</strong> <?= invoiceNumber ?><br>
+          <strong>Date:</strong> <?= currentDate ?><br>
+          <strong>Due Date:</strong> <?= dueDate ?><br>
+          <strong>Currency:</strong> <?= currency ?>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Unit Price</th>
+              <th>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <? for (var i = 0; i < items.length; i++) { ?>
+              <tr>
+                <td><?= items[i].description ?></td>
+                <td><?= items[i].quantity ?></td>
+                <td><?= currency ?> <?= items[i].unitPrice.toFixed(2) ?></td>
+                <td><?= currency ?> <?= items[i].total.toFixed(2) ?></td>
+              </tr>
+            <? } ?>
+          </tbody>
+        </table>
+        
+        <div class="total">
+          <strong>Total Amount: <?= currency ?> <?= subtotal.toFixed(2) ?></strong>
+        </div>
+        
+        <div class="payment-terms">
+          <strong>Payment Terms:</strong><br>
+          Please pay the total amount by <?= dueDate ?>.
+        </div>
+      </body>
+    </html>
+    

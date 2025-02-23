@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+      "target": "ES2019",
+      "module": "None",
+      "lib": ["ES2019"],
+      "rootDir": "./src",
+      "outDir": "./build",
+      "strict": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
+      "moduleResolution": "node",
+      "baseUrl": "./src",
+      "paths": {
+        "*": ["*", "types/*"]
+      },
+      "types": ["google-apps-script"],  // Removed "node"
+      "noImplicitThis": true,
+      "noImplicitAny": true,
+      "strictFunctionTypes": true,
+      "strictPropertyInitialization": true
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules"]
+}

@@ -1,0 +1,18 @@
+# Ignore everything
+**/**
+
+# Include only what we need
+!appsscript.json
+!build/*.js
+!build/**/*.js
+!templates/**/*.html
+
+# Explicitly ignore development files
+.git/**
+.vscode/**
+node_modules/**
+*.ts
+*.json
+!appsscript.json
+*.md
+*.log
