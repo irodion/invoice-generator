@@ -1,8 +1,8 @@
 /**
  * Invoice Generator for Google Sheets
- * 
+ *
  * Copyright (c) 2025 Rodion Izotov
- * 
+ *
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  */
@@ -59,25 +59,25 @@ const TEMPLATES: InvoiceTypes.TemplateConfig[] = [
     id: 'default',
     name: 'Default Template',
     description: 'Standard invoice template with basic styling',
-    filename: 'DefaultTemplate'
+    filename: 'DefaultTemplate',
   },
   {
     id: 'modern',
     name: 'Modern Template',
     description: 'Contemporary design with enhanced styling',
-    filename: 'ModernTemplate'
+    filename: 'ModernTemplate',
   },
   {
     id: 'printer-friendly',
     name: 'Printer-Friendly Template',
     description: 'Clean, minimal design optimized for printing',
-    filename: 'PrinterFriendlyTemplate'
-  }
+    filename: 'PrinterFriendlyTemplate',
+  },
 ];
 
 // Template management functions
 function getTemplatesList(): InvoiceTypes.TemplateConfig[] {
-  console.info(">>> TEMPLATES <<< ", TEMPLATES);
+  console.info('>>> TEMPLATES <<< ', TEMPLATES);
   return TEMPLATES;
 }
 
@@ -103,7 +103,9 @@ function validateNumber(value: unknown, fieldName: string): number {
   return num;
 }
 
-function validateSelection(selection: GoogleAppsScript.Spreadsheet.Range | null): GoogleAppsScript.Spreadsheet.Range {
+function validateSelection(
+  selection: GoogleAppsScript.Spreadsheet.Range | null
+): GoogleAppsScript.Spreadsheet.Range {
   if (!selection) {
     throw new Error('No range selected. Please select invoice items.');
   }
@@ -114,20 +116,18 @@ function validateRowData(row: unknown[], rowIndex: number): void {
   if (row.length < 3) {
     throw new Error(`Row ${rowIndex + 1} is missing required fields.`);
   }
-  
+
   if (!row[0]) {
     throw new Error(`Row ${rowIndex + 1} is missing a description.`);
   }
-  
+
   validateNumber(row[1], `quantity in row ${rowIndex + 1}`);
   validateNumber(row[2], `unit price in row ${rowIndex + 1}`);
 }
 
 function onOpen(): void {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('Invoice Generator')
-    .addItem('Generate Invoice', 'showInvoiceDialog')
-    .addToUi();
+  ui.createMenu('Invoice Generator').addItem('Generate Invoice', 'showInvoiceDialog').addToUi();
 }
 
 function showInvoiceDialog() {
@@ -136,7 +136,7 @@ function showInvoiceDialog() {
     .setWidth(600)
     .setHeight(500)
     .setSandboxMode(HtmlService.SandboxMode.IFRAME);
-  
+
   SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
 }
 
@@ -147,12 +147,13 @@ function getCompanyData(): InvoiceTypes.Company[] {
 
   // Skip header row
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0]) { // If name exists
+    if (data[i][0]) {
+      // If name exists
       companies.push({
         name: data[i][0],
         address: data[i][1],
         email: data[i][2],
-        phone: data[i][3]
+        phone: data[i][3],
       });
     }
   }
@@ -166,12 +167,13 @@ function getContragentData(): InvoiceTypes.Contragent[] {
 
   // Skip header row
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0]) { // If company name exists
+    if (data[i][0]) {
+      // If company name exists
       contragents.push({
         companyName: data[i][0],
         address: data[i][1],
         email: data[i][2],
-        phone: data[i][3]
+        phone: data[i][3],
       });
     }
   }
@@ -179,15 +181,16 @@ function getContragentData(): InvoiceTypes.Contragent[] {
 }
 
 function cleanNameForFile(name: string): string {
-  return name.replace(/[^a-zA-Z0-9]/g, '')
+  return name
+    .replace(/[^a-zA-Z0-9]/g, '')
     .toLowerCase()
     .substring(0, 10);
 }
 
 function getOrCreateInvoicesFolder(): GoogleAppsScript.Drive.Folder {
-  const folderName = "Invoices";
+  const folderName = 'Invoices';
   const folders = DriveApp.getFoldersByName(folderName);
-  
+
   if (folders.hasNext()) {
     return folders.next();
   }
@@ -220,7 +223,7 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
 
     const company = companies[invoiceData.companyIndex];
     const contragent = contragents[invoiceData.contragentIndex];
-    
+
     // Calculate dates
     const currentDate = new Date();
     const dueDate = new Date(currentDate);
@@ -236,12 +239,12 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
       const unitPrice = validateNumber(row[2], `unit price in row ${index + 1}`);
       const total = quantity * unitPrice;
       subtotal += total;
-      
+
       return {
         description: String(row[0]),
         quantity,
         unitPrice,
-        total
+        total,
       };
     });
 
@@ -254,29 +257,27 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
       dueDate: Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
       currency: invoiceData.currency,
       items,
-      subtotal
+      subtotal,
     });
 
     // Generate PDF
     const htmlOutput = template.evaluate().getContent();
     const blob = Utilities.newBlob(htmlOutput, 'text/html', 'invoice.html');
     const pdf = blob.getAs('application/pdf');
-    
+
     // Create filename
     const cleanContragentName = cleanNameForFile(contragent.companyName);
     const dateStr = Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'yyyyMMdd');
     const fileName = `${cleanContragentName}_${invoiceData.invoiceNumber}_${dateStr}.pdf`;
-    
+
     // Save to Drive
     const folder = getOrCreateInvoicesFolder();
     folder.createFile(pdf.setName(fileName));
-    
+
     // Show success message
     SpreadsheetApp.getUi().alert(
-      'Invoice has been generated successfully!\n\n' +
-      'Location: Invoices/' + fileName
+      'Invoice has been generated successfully!\n\n' + 'Location: Invoices/' + fileName
     );
-    
   } catch (error) {
     // Type guard for our custom error
     if (error instanceof InvoiceTypes.InvoiceError) {
