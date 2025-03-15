@@ -154,6 +154,7 @@ function getCompanyData(): InvoiceTypes.Company[] {
         address: data[i][1],
         email: data[i][2],
         phone: data[i][3],
+        driveFolder: data[i][5],
       });
     }
   }
