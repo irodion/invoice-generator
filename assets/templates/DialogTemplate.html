@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        max-width: 500px;
+        margin: 0 auto;
+      }
+      .form-group {
+        margin-bottom: 15px;
+        display: block;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+      select, input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+        display: block;
+      }
+      #debug {
+        margin-top: 20px;
+        padding: 10px;
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        display: none;
+      }
+      .template-description {
+        font-size: 0.9em;
+        color: #666;
+        margin-top: 5px;
+        font-style: italic;
+      }
+      .button-container {
+        margin-top: 25px;
+        text-align: center;
+      }
+      button[type="submit"] {
+        background-color: #1a73e8;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 4px;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        min-width: 200px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      button[type="submit"].loading {
+        background-color: #1557a0;
+        cursor: wait;
+      }
+      button[type="submit"].loading::after {
+        content: '';
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        margin-left: 10px;
+        border: 3px solid #ffffff;
+        border-top: 3px solid transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      button[type="submit"]:hover {
+        background-color: #185abc;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+      }
+      button[type="submit"]:active {
+        background-color: #1557a0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        transform: translateY(1px);
+      }
+      button[type="submit"]:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="debug"></div>
+    <form id="invoiceForm" onsubmit="generateInvoice(); return false;">
+      <div class="form-group">
+        <label for="invoiceNumber">Invoice Number:</label>
+        <input type="text" id="invoiceNumber" required>
+      </div>
+
+      <div class="form-group">
+        <label for="companySelect">Your Company:</label>
+        <select id="companySelect" required>
+          <option value="">Select company...</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="contragentSelect">Client:</label>
+        <select id="contragentSelect" required>
+          <option value="">Select client...</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="currencySelect">Currency:</label>
+        <select id="currencySelect" required>
+          <option value="USD">USD</option>
+          <option value="EUR">EUR</option>
+          <option value="GBP">GBP</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="templateSelect">Invoice Template:</label>
+        <select id="templateSelect" required>
+          <option value="">Select template...</option>
+        </select>
+        <div id="templateDescription" class="template-description"></div>
+      </div>
+
+      <div class="button-container">
+        <button type="submit" id="generateButton">Generate Invoice</button>
+      </div>
+    </form>
+
+    <script>
+      // Debug function
+      function log(message) {
+        // console.log(message);
+        // const debug = document.getElementById('debug');
+        // debug.style.display = 'block';
+        // debug.innerHTML += message + '<br>';
+      }
+
+      // Initialize form when the page loads
+      window.onload = function() {
+        log('Page loaded');
+        
+        // Set default currency
+        document.getElementById('currencySelect').value = "USD";
+        
+        // Load templates
+        log('Requesting templates...');
+        google.script.run
+          .withSuccessHandler(function(templates) {
+            log('Templates received: ' + JSON.stringify(templates));
+            loadTemplates(templates);
+          })
+          .withFailureHandler(function(error) {
+            log('Error loading templates: ' + error);
+          })
+          .getTemplatesList();
+
+        // Load companies
+        log('Requesting companies...');
+        google.script.run
+          .withSuccessHandler(function(companies) {
+            log('Companies received: ' + JSON.stringify(companies));
+            loadCompanies(companies);
+          })
+          .withFailureHandler(function(error) {
+            log('Error loading companies: ' + error);
+          })
+          .getCompanyData();
+
+        // Load contragents
+        log('Requesting contragents...');
+        google.script.run
+          .withSuccessHandler(function(contragents) {
+            log('Contragents received: ' + JSON.stringify(contragents));
+            loadContragents(contragents);
+          })
+          .withFailureHandler(function(error) {
+            log('Error loading contragents: ' + error);
+          })
+          .getContragentData();
+      };
+
+      function loadCompanies(companies) {
+        var select = document.getElementById('companySelect');
+        companies.forEach(function(company, index) {
+          var option = document.createElement('option');
+          option.value = index;
+          option.text = company.name;
+          select.appendChild(option);
+        });
+        // Select first company if available
+        if (companies.length > 0) {
+          select.value = "0";
+        }
+        log('Companies loaded into select');
+      }
+
+      function loadContragents(contragents) {
+        var select = document.getElementById('contragentSelect');
+        contragents.forEach(function(contragent, index) {
+          var option = document.createElement('option');
+          option.value = index;
+          option.text = contragent.companyName;
+          select.appendChild(option);
+        });
+        // Select first contragent if available
+        if (contragents.length > 0) {
+          select.value = "0";
+        }
+        log('Contragents loaded into select');
+      }
+
+      function loadTemplates(templates) {
+        var select = document.getElementById('templateSelect');
+        templates.forEach(function(template) {
+          var option = document.createElement('option');
+          option.value = template.id;
+          option.text = template.name;
+          option.dataset.description = template.description;
+          select.appendChild(option);
+        });
+        // Select first template if available
+        if (templates.length > 0) {
+          select.value = templates[0].id;
+          updateTemplateDescription();
+        }
+        log('Templates loaded into select');
+        
+        select.addEventListener('change', updateTemplateDescription);
+      }
+
+      function updateTemplateDescription() {
+        var select = document.getElementById('templateSelect');
+        var descriptionDiv = document.getElementById('templateDescription');
+        var selectedOption = select.options[select.selectedIndex];
+        if (selectedOption && selectedOption.dataset.description) {
+          descriptionDiv.textContent = selectedOption.dataset.description;
+        } else {
+          descriptionDiv.textContent = '';
+        }
+      }
+
+      function generateInvoice() {
+        var button = document.getElementById('generateButton');
+        var originalText = button.textContent;
+        
+        // Disable the button and show loading state
+        button.disabled = true;
+        button.classList.add('loading');
+        button.textContent = 'Generating...';
+        
+        var invoiceData = {
+          invoiceNumber: document.getElementById('invoiceNumber').value,
+          companyIndex: parseInt(document.getElementById('companySelect').value),
+          contragentIndex: parseInt(document.getElementById('contragentSelect').value),
+          currency: document.getElementById('currencySelect').value,
+          templateId: document.getElementById('templateSelect').value
+        };
+        
+        log('Generating invoice with data: ' + JSON.stringify(invoiceData));
+
+        google.script.run
+          .withSuccessHandler(function() {
+            log('Invoice generated successfully');
+            button.classList.remove('loading');
+            button.textContent = 'Done!';
+            setTimeout(function() {
+              google.script.host.close();
+            }, 1000);
+          })
+          .withFailureHandler(function(error) {
+            log('Error generating invoice: ' + error);
+            button.disabled = false;
+            button.classList.remove('loading');
+            button.textContent = originalText;
+            // Show error message to user
+            alert('Error generating invoice: ' + error);
+          })
+          .generateInvoicePDF(invoiceData);
+      }
+    </script>
+  </body>
+</html>

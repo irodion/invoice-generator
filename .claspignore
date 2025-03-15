@@ -2,10 +2,13 @@
 **/**
 
 # Include only what we need
-!appsscript.json
-!build/*.js
-!build/**/*.js
+!**/*.gs
+!*.gs
+!**/*.js
+!*.js
 !templates/**/*.html
+!templates/*.html
+!appsscript.json
 
 # Explicitly ignore development files
 .git/**

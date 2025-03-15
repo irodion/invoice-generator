@@ -1,0 +1,7 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:0-18",
+  "remoteUser": "node",
+  "containerUser": "node",
+  "postAttachCommand": "sudo chown -R node /workspaces",
+  "runArgs": ["--user", "node"]
+}

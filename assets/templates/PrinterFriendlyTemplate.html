@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      color: #000;
+      line-height: 1.3;
+      margin: 0;
+      padding: 10px;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    
+    td {
+      padding: 4px 6px;
+      vertical-align: top;
+    }
+    
+    .header {
+      margin-bottom: 20px;
+    }
+    
+    .invoice-title {
+      font-size: 24px;
+      font-weight: bold;
+      text-align: right;
+    }
+    
+    .company-name {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .bill-to-header, .invoice-details-header {
+      font-weight: bold;
+    }
+    
+    .item-table {
+      margin: 20px 0;
+    }
+    
+    .item-table th {
+      border-bottom: 1px solid #000;
+      text-align: left;
+      font-weight: bold;
+      padding: 6px;
+    }
+    
+    .item-table td {
+      border-bottom: 1px solid #ddd;
+      padding: 6px;
+    }
+    
+    .amount-column {
+      text-align: right;
+    }
+    
+    .totals-table {
+      width: 30%;
+      margin-left: auto;
+      margin-right: 0;
+    }
+    
+    .totals-table td {
+      padding: 3px 6px;
+    }
+    
+    .total-label {
+      text-align: right;
+      font-weight: normal;
+    }
+    
+    .total-amount {
+      text-align: right;
+      font-weight: bold;
+    }
+    
+    .balance-due {
+      font-weight: bold;
+      font-size: 14px;
+    }
+    
+    .thank-you {
+      margin: 20px 0;
+    }
+    
+    .terms-section {
+      margin-top: 30px;
+      border-top: 1px solid #ddd;
+      padding-top: 10px;
+    }
+    
+    .terms-header {
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <table class="header">
+    <tr>
+      <td width="60%">
+        <div class="company-name"><?= company.name ?></div>
+        <div><?= company.address ?></div>
+        <div><?= company.email ?></div>
+        <div><?= company.phone ?></div>
+      </td>
+      <td width="40%">
+        <div class="invoice-title">INVOICE</div>
+      </td>
+    </tr>
+  </table>
+  
+  <table>
+    <tr>
+      <td width="60%">
+        <div class="bill-to-header">BILL TO</div>
+        <div><strong><?= contragent.companyName ?></strong></div>
+        <div><?= contragent.address ?></div>
+        <div><?= contragent.email ?>, <?= contragent.phone ?></div>
+      </td>
+      <td width="40%">
+        <table>
+          <tr>
+            <td class="invoice-details-header">Invoice No:</td>
+            <td>#<?= invoiceNumber ?></td>
+          </tr>
+          <tr>
+            <td class="invoice-details-header">Invoice Date:</td>
+            <td><?= currentDate ?></td>
+          </tr>
+          <tr>
+            <td class="invoice-details-header">Due Date:</td>
+            <td><?= dueDate ?></td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  
+  <table class="item-table">
+    <thead>
+      <tr>
+        <th width="50%">DESCRIPTION</th>
+        <th>QTY</th>
+        <th>UNIT PRICE</th>
+        <th>TOTAL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <? for (var i = 0; i < items.length; i++) { ?>
+        <tr>
+          <td><?= items[i].description ?></td>
+          <td><?= items[i].quantity ?></td>
+          <td class="amount-column"><?= currency ?> <?= items[i].unitPrice.toFixed(2) ?></td>
+          <td class="amount-column"><?= currency ?> <?= items[i].total.toFixed(2) ?></td>
+        </tr>
+      <? } ?>
+    </tbody>
+  </table>
+  
+  <div class="thank-you">Thank you for your business!</div>
+  
+  <table class="totals-table">
+    <tr>
+      <td class="total-label">SUBTOTAL</td>
+      <td class="total-amount"><?= currency ?> <?= subtotal.toFixed(2) ?></td>
+    </tr>
+    <tr>
+      <td class="total-label">DISCOUNT</td>
+      <td class="total-amount"><?= currency ?> 0.00</td>
+    </tr>
+    <tr>
+      <td class="total-label">TAX RATE</td>
+      <td class="total-amount">0.00%</td>
+    </tr>
+    <tr>
+      <td class="total-label">TOTAL TAX</td>
+      <td class="total-amount"><?= currency ?> 0.00</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="height: 10px;"></td>
+    </tr>
+    <tr>
+      <td class="total-label balance-due">Balance Due</td>
+      <td class="total-amount balance-due"><?= currency ?> <?= subtotal.toFixed(2) ?></td>
+    </tr>
+  </table>
+  
+  <div class="terms-section">
+    <div class="terms-header">Terms & Instructions</div>
+    <div>Payment is due by <?= dueDate ?>.</div>
+    <div>Please include the invoice number with your payment.</div>
+  </div>
+</body>
+</html>

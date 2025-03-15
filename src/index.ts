@@ -1,38 +1,97 @@
-// Types remain the same
-interface Company {
-  name: string;
-  address: string;
-  email: string;
-  phone: string;
-}
+/**
+ * Invoice Generator for Google Sheets
+ * 
+ * Copyright (c) 2025 Rodion Izotov
+ * 
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 
-interface Contragent {
-  companyName: string;
-  address: string;
-  email: string;
-  phone: string;
-}
-
-interface InvoiceData {
-  invoiceNumber: string;
-  companyIndex: number;
-  contragentIndex: number;
-  currency: string;
-}
-
-interface InvoiceItem {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  total: number;
-}
-
-// Custom error class
-class InvoiceError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'InvoiceError';
+namespace InvoiceTypes {
+  export interface Company {
+    name: string;
+    address: string;
+    email: string;
+    phone: string;
+    driveFolder: string;
   }
+
+  export interface Contragent {
+    companyName: string;
+    address: string;
+    email: string;
+    phone: string;
+  }
+
+  export interface InvoiceData {
+    invoiceNumber: string;
+    companyIndex: number;
+    contragentIndex: number;
+    currency: string;
+    templateId: string;
+  }
+
+  export interface InvoiceItem {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }
+
+  export interface TemplateConfig {
+    id: string;
+    name: string;
+    description: string;
+    filename: string;
+  }
+
+  export class InvoiceError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'InvoiceError';
+    }
+  }
+}
+
+// Template configurations
+const TEMPLATES: InvoiceTypes.TemplateConfig[] = [
+  {
+    id: 'default',
+    name: 'Default Template',
+    description: 'Standard invoice template with basic styling',
+    filename: 'DefaultTemplate'
+  },
+  {
+    id: 'modern',
+    name: 'Modern Template',
+    description: 'Contemporary design with enhanced styling',
+    filename: 'ModernTemplate'
+  },
+  {
+    id: 'printer-friendly',
+    name: 'Printer-Friendly Template',
+    description: 'Clean, minimal design optimized for printing',
+    filename: 'PrinterFriendlyTemplate'
+  }
+];
+
+// Template management functions
+function getTemplatesList(): InvoiceTypes.TemplateConfig[] {
+  console.info(">>> TEMPLATES <<< ", TEMPLATES);
+  return TEMPLATES;
+}
+
+function getTemplateById(id: string): InvoiceTypes.TemplateConfig | undefined {
+  return TEMPLATES.find(template => template.id === id);
+}
+
+function getDefaultTemplate(): InvoiceTypes.TemplateConfig {
+  return TEMPLATES[0];
+}
+
+function loadTemplate(templateId: string): GoogleAppsScript.HTML.HtmlTemplate {
+  const template = getTemplateById(templateId) || getDefaultTemplate();
+  return HtmlService.createTemplateFromFile(`templates/${template.filename}`);
 }
 
 // Validation functions
@@ -71,18 +130,20 @@ function onOpen(): void {
     .addToUi();
 }
 
-function showInvoiceDialog(): void {
-  const html = HtmlService.createTemplateFromFile('templates/DialogTemplate.html')
+function showInvoiceDialog() {
+  const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
     .evaluate()
-    .setWidth(400)
-    .setHeight(300);
+    .setWidth(600)
+    .setHeight(500)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+  
   SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
 }
 
-function getCompanyData(): Company[] {
+function getCompanyData(): InvoiceTypes.Company[] {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
   const data = sheet.getDataRange().getValues();
-  const companies: Company[] = [];
+  const companies: InvoiceTypes.Company[] = [];
 
   // Skip header row
   for (let i = 1; i < data.length; i++) {
@@ -98,10 +159,10 @@ function getCompanyData(): Company[] {
   return companies;
 }
 
-function getContragentData(): Contragent[] {
+function getContragentData(): InvoiceTypes.Contragent[] {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
   const data = sheet.getDataRange().getValues();
-  const contragents: Contragent[] = [];
+  const contragents: InvoiceTypes.Contragent[] = [];
 
   // Skip header row
   for (let i = 1; i < data.length; i++) {
@@ -133,13 +194,11 @@ function getOrCreateInvoicesFolder(): GoogleAppsScript.Drive.Folder {
   return DriveApp.createFolder(folderName);
 }
 
-function generateInvoicePDF(invoiceData: InvoiceData): void {
+function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
   try {
     // Get the active spreadsheet and selected rows
     const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     const activeSheet = spreadsheet.getActiveSheet();
-    
-    // Use validation utilities
     const selection = validateSelection(activeSheet.getActiveRange());
     const selectedRows = selection.getValues();
 
@@ -152,12 +211,11 @@ function generateInvoicePDF(invoiceData: InvoiceData): void {
     const companies = getCompanyData();
     const contragents = getContragentData();
 
-    // Validate indices
     if (invoiceData.companyIndex >= companies.length) {
-      throw new InvoiceError('Invalid company selected.');
+      throw new Error('Invalid company selected.');
     }
     if (invoiceData.contragentIndex >= contragents.length) {
-      throw new InvoiceError('Invalid contragent selected.');
+      throw new Error('Invalid contragent selected.');
     }
 
     const company = companies[invoiceData.companyIndex];
@@ -167,14 +225,16 @@ function generateInvoicePDF(invoiceData: InvoiceData): void {
     const currentDate = new Date();
     const dueDate = new Date(currentDate);
     dueDate.setMonth(dueDate.getMonth() + 1);
-    
-    // Calculate totals using validation
+
+    // Load the template
+    const template = loadTemplate(invoiceData.templateId);
+
+    // Process items and calculate totals
     let subtotal = 0;
-    const items: InvoiceItem[] = selectedRows.map((row, index) => {
+    const items: InvoiceTypes.InvoiceItem[] = selectedRows.map((row, index) => {
       const quantity = validateNumber(row[1], `quantity in row ${index + 1}`);
       const unitPrice = validateNumber(row[2], `unit price in row ${index + 1}`);
-      
-      const total = unitPrice * quantity;
+      const total = quantity * unitPrice;
       subtotal += total;
       
       return {
@@ -184,12 +244,6 @@ function generateInvoicePDF(invoiceData: InvoiceData): void {
         total
       };
     });
-
-    // Create HTML template
-    const template = HtmlService.createTemplate(
-      HtmlService.createTemplateFromFile('templates/InvoiceTemplate.html')
-        .getRawContent()
-    );
 
     // Set template variables
     Object.assign(template, {
@@ -225,7 +279,7 @@ function generateInvoicePDF(invoiceData: InvoiceData): void {
     
   } catch (error) {
     // Type guard for our custom error
-    if (error instanceof InvoiceError) {
+    if (error instanceof InvoiceTypes.InvoiceError) {
       SpreadsheetApp.getUi().alert('Error: ' + error.message);
     } else {
       // Handle unknown errors

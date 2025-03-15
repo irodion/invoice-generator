@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    :root {
+      --primary-color: #2563eb;
+      --text-color: #1f2937;
+      --border-color: #e5e7eb;
+      --background-subtle: #f9fafb;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-color);
+      line-height: 1.4;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .invoice-container {
+      max-width: 800px;
+      margin: 0 auto;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 25px;
+      box-shadow: 0 2px 4px rgb(0 0 0 / 0.1);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .company-logo {
+      width: 160px;
+      height: 50px;
+      background-color: var(--background-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .invoice-title {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--primary-color);
+      margin: 0;
+    }
+
+    .invoice-details {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+
+    .invoice-section {
+      background-color: var(--background-subtle);
+      padding: 15px;
+      border-radius: 6px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary-color);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .company-details, .client-details {
+      font-style: normal;
+      line-height: 1.4;
+      font-size: 13px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13px;
+    }
+
+    th {
+      background-color: var(--background-subtle);
+      text-align: left;
+      padding: 8px;
+      font-weight: 600;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .amount-column {
+      text-align: right;
+    }
+
+    .totals-section {
+      margin-left: auto;
+      width: 250px;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+
+    .total-row.grand-total {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary-color);
+      border-top: 2px solid var(--border-color);
+      margin-top: 4px;
+      padding-top: 8px;
+    }
+
+    .payment-terms {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border-color);
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      font-size: 13px;
+    }
+
+    .detail-label {
+      color: #6b7280;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="invoice-container">
+    <div class="header">
+      <div class="brand-section">
+        <div class="company-logo"><?= company.name ?></div>
+      </div>
+      <div class="title-section">
+        <h1 class="invoice-title">INVOICE</h1>
+        <div style="color: #6b7280; font-size: 13px">#<?= invoiceNumber ?></div>
+      </div>
+    </div>
+
+    <div class="invoice-details">
+      <div class="invoice-section">
+        <div class="section-title">From</div>
+        <address class="company-details">
+          <strong><?= company.name ?></strong><br>
+          <?= company.address ?><br>
+          <?= company.email ?><br>
+          <?= company.phone ?>
+        </address>
+      </div>
+
+      <div class="invoice-section">
+        <div class="section-title">Bill To</div>
+        <address class="client-details">
+          <strong><?= contragent.companyName ?></strong><br>
+          <?= contragent.address ?><br>
+          <?= contragent.email ?><br>
+          <?= contragent.phone ?>
+        </address>
+      </div>
+    </div>
+
+    <div class="invoice-section" style="margin-bottom: 20px">
+      <div class="section-title">Invoice Details</div>
+      <div class="detail-grid">
+        <div>
+          <div class="detail-label">Issue Date</div>
+          <div style="font-weight: 500"><?= currentDate ?></div>
+        </div>
+        <div>
+          <div class="detail-label">Due Date</div>
+          <div style="font-weight: 500"><?= dueDate ?></div>
+        </div>
+        <div>
+          <div class="detail-label">Currency</div>
+          <div style="font-weight: 500"><?= currency ?></div>
+        </div>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 50%">Description</th>
+          <th>Quantity</th>
+          <th class="amount-column">Unit Price</th>
+          <th class="amount-column">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <? for (var i = 0; i < items.length; i++) { ?>
+          <tr>
+            <td><?= items[i].description ?></td>
+            <td><?= items[i].quantity ?></td>
+            <td class="amount-column"><?= currency ?> <?= items[i].unitPrice.toFixed(2) ?></td>
+            <td class="amount-column"><?= currency ?> <?= items[i].total.toFixed(2) ?></td>
+          </tr>
+        <? } ?>
+      </tbody>
+    </table>
+
+    <div class="totals-section">
+      <div class="total-row">
+        <span>Subtotal</span>
+        <span><?= currency ?> <?= subtotal.toFixed(2) ?></span>
+      </div>
+      <div class="total-row grand-total">
+        <span>Total Due</span>
+        <span><?= currency ?> <?= subtotal.toFixed(2) ?></span>
+      </div>
+    </div>
+
+    <div class="payment-terms">
+      <div class="section-title">Payment Terms</div>
+      <p style="margin: 5px 0">Please make payment by <?= dueDate ?>. Thank you for your business!</p>
+    </div>
+  </div>
+</body>
+</html>
