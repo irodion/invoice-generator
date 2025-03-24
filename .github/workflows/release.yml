@@ -1,0 +1,88 @@
+name: Create Release
+
+# Controls when the workflow will run
+on:
+  # Trigger on push to main/master branch
+  push:
+    branches: [ main, master ]
+    # Optionally, only run when specific files change
+    paths:
+      - 'build/**'
+      - 'src/**'
+      - 'templates/**'
+      - 'appsscript.json'
+      
+  # Allow manual triggering
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      # Set up Node.js environment
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      # Install dependencies
+      - name: Install dependencies
+        run: npm ci
+      
+      # Build the project (if needed)
+      - name: Build project
+        run: npm run build
+      
+      # Create a ZIP file of the build directory
+      - name: Create ZIP file
+        run: |
+          cd build
+          zip -r ../invoice-generator-build.zip .
+          cd ..
+          
+      # Generate version number from date and commit short hash
+      - name: Generate version number
+        id: version
+        run: echo "version=$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+        # For local testing only
+      - name: Create Release (Local Test)
+        if: ${{ env.ACT }}
+        run: |
+          echo "Would create release with tag: v${{ steps.version.outputs.version }}"
+          echo "Would upload: invoice-generator-build.zip"
+          
+      # This will only run on GitHub, not locally with Act
+      # Create a GitHub release
+      - name: Create Release
+        if: ${{ !env.ACT }}
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            # Invoice Generator Release
+            
+            Automated release of the Google Sheets Invoice Generator.
+            
+            ## Installation
+            
+            1. Download the ZIP file
+            2. Extract the contents
+            3. Follow the instructions in the README.md
+            
+            ## Changes in this release
+            
+            ${{ github.event.head_commit.message }}
+          files: |
+            invoice-generator-build.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
