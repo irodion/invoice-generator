@@ -23,24 +23,24 @@ const TEMPLATES = [
         id: 'default',
         name: 'Default Template',
         description: 'Standard invoice template with basic styling',
-        filename: 'DefaultTemplate'
+        filename: 'DefaultTemplate',
     },
     {
         id: 'modern',
         name: 'Modern Template',
         description: 'Contemporary design with enhanced styling',
-        filename: 'ModernTemplate'
+        filename: 'ModernTemplate',
     },
     {
         id: 'printer-friendly',
         name: 'Printer-Friendly Template',
         description: 'Clean, minimal design optimized for printing',
-        filename: 'PrinterFriendlyTemplate'
-    }
+        filename: 'PrinterFriendlyTemplate',
+    },
 ];
 // Template management functions
 function getTemplatesList() {
-    console.info(">>> TEMPLATES <<< ", TEMPLATES);
+    console.info('>>> TEMPLATES <<< ', TEMPLATES);
     return TEMPLATES;
 }
 function getTemplateById(id) {
@@ -79,9 +79,7 @@ function validateRowData(row, rowIndex) {
 }
 function onOpen() {
     const ui = SpreadsheetApp.getUi();
-    ui.createMenu('Invoice Generator')
-        .addItem('Generate Invoice', 'showInvoiceDialog')
-        .addToUi();
+    ui.createMenu('Invoice Generator').addItem('Generate Invoice', 'showInvoiceDialog').addToUi();
 }
 function showInvoiceDialog() {
     const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
@@ -97,15 +95,20 @@ function getCompanyData() {
     const companies = [];
     // Skip header row
     for (let i = 1; i < data.length; i++) {
-        if (data[i][0]) { // If name exists
+        if (data[i][0]) {
+            // If name exists
             companies.push({
                 name: data[i][0],
                 address: data[i][1],
                 email: data[i][2],
                 phone: data[i][3],
-                driveFolder: data[i][4] || ''
+                driveFolder: data[i][4] || '', // Ensure we handle undefined values properly
             });
         }
+    }
+    // Log the first company's driveFolder value for debugging
+    if (companies.length > 0) {
+        console.log("First company's drive folder: " + companies[0].driveFolder);
     }
     return companies;
 }
@@ -115,29 +118,44 @@ function getContragentData() {
     const contragents = [];
     // Skip header row
     for (let i = 1; i < data.length; i++) {
-        if (data[i][0]) { // If company name exists
+        if (data[i][0]) {
+            // If company name exists
             contragents.push({
                 companyName: data[i][0],
                 address: data[i][1],
                 email: data[i][2],
-                phone: data[i][3]
+                phone: data[i][3],
             });
         }
     }
     return contragents;
 }
 function cleanNameForFile(name) {
-    return name.replace(/[^a-zA-Z0-9]/g, '')
+    return name
+        .replace(/[^a-zA-Z0-9]/g, '')
         .toLowerCase()
         .substring(0, 10);
 }
-function getOrCreateInvoicesFolder() {
-    const folderName = "Invoices";
-    const folders = DriveApp.getFoldersByName(folderName);
-    if (folders.hasNext()) {
-        return folders.next();
+function getOrCreateInvoicesFolder(folderName = 'Invoices') {
+    // Use default 'Invoices' folder if no name is provided or if it's empty
+    const finalFolderName = folderName && folderName.trim() ? folderName.trim() : 'Invoices';
+    console.log("Creating/finding folder with name:", finalFolderName);
+    try {
+        const folders = DriveApp.getFoldersByName(finalFolderName);
+        if (folders.hasNext()) {
+            const folder = folders.next();
+            console.log("Found existing folder:", folder.getName(), "with ID:", folder.getId());
+            return folder;
+        }
+        const newFolder = DriveApp.createFolder(finalFolderName);
+        console.log("Created new folder:", newFolder.getName(), "with ID:", newFolder.getId());
+        return newFolder;
     }
-    return DriveApp.createFolder(folderName);
+    catch (error) {
+        console.error("Error in folder creation:", error);
+        // Fallback to root folder with a default name if there's an error
+        return DriveApp.createFolder('Invoices_Fallback');
+    }
 }
 function generateInvoicePDF(invoiceData) {
     try {
@@ -160,6 +178,8 @@ function generateInvoicePDF(invoiceData) {
             throw new Error('Invalid contragent selected.');
         }
         const company = companies[invoiceData.companyIndex];
+        console.log("Selected company for invoice:", company.name);
+        console.log("Drive folder for this company:", company.driveFolder);
         const contragent = contragents[invoiceData.contragentIndex];
         // Calculate dates
         const currentDate = new Date();
@@ -178,7 +198,7 @@ function generateInvoicePDF(invoiceData) {
                 description: String(row[0]),
                 quantity,
                 unitPrice,
-                total
+                total,
             };
         });
         // Set template variables
@@ -190,7 +210,7 @@ function generateInvoicePDF(invoiceData) {
             dueDate: Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
             currency: invoiceData.currency,
             items,
-            subtotal
+            subtotal,
         });
         // Generate PDF
         const htmlOutput = template.evaluate().getContent();
@@ -200,12 +220,12 @@ function generateInvoicePDF(invoiceData) {
         const cleanContragentName = cleanNameForFile(contragent.companyName);
         const dateStr = Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'yyyyMMdd');
         const fileName = `${cleanContragentName}_${invoiceData.invoiceNumber}_${dateStr}.pdf`;
-        // Save to Drive
-        const folder = getOrCreateInvoicesFolder();
-        folder.createFile(pdf.setName(fileName));
+        // Use the company's custom folder name if available, otherwise use default
+        const folder = getOrCreateInvoicesFolder(company.driveFolder);
+        const createdFile = folder.createFile(pdf.setName(fileName));
         // Show success message
         SpreadsheetApp.getUi().alert('Invoice has been generated successfully!\n\n' +
-            'Location: Invoices/' + fileName);
+            `Location: ${folder.getName()}/${fileName}`);
     }
     catch (error) {
         // Type guard for our custom error
