@@ -154,10 +154,16 @@ function getCompanyData(): InvoiceTypes.Company[] {
         address: data[i][1],
         email: data[i][2],
         phone: data[i][3],
-        driveFolder: data[i][5],
+        driveFolder: data[i][4] || '', // Ensure we handle undefined values properly
       });
     }
   }
+  
+  // Log the first company's driveFolder value for debugging
+  if (companies.length > 0) {
+    console.log("First company's drive folder: " + companies[0].driveFolder);
+  }
+  
   return companies;
 }
 
@@ -188,14 +194,29 @@ function cleanNameForFile(name: string): string {
     .substring(0, 10);
 }
 
-function getOrCreateInvoicesFolder(): GoogleAppsScript.Drive.Folder {
-  const folderName = 'Invoices';
-  const folders = DriveApp.getFoldersByName(folderName);
+function getOrCreateInvoicesFolder(folderName: string = 'Invoices'): GoogleAppsScript.Drive.Folder {
+  // Use default 'Invoices' folder if no name is provided or if it's empty
+  const finalFolderName = folderName && folderName.trim() ? folderName.trim() : 'Invoices';
+  
+  console.log("Creating/finding folder with name:", finalFolderName);
+  
+  try {
+    const folders = DriveApp.getFoldersByName(finalFolderName);
 
-  if (folders.hasNext()) {
-    return folders.next();
+    if (folders.hasNext()) {
+      const folder = folders.next();
+      console.log("Found existing folder:", folder.getName(), "with ID:", folder.getId());
+      return folder;
+    }
+    
+    const newFolder = DriveApp.createFolder(finalFolderName);
+    console.log("Created new folder:", newFolder.getName(), "with ID:", newFolder.getId());
+    return newFolder;
+  } catch (error) {
+    console.error("Error in folder creation:", error);
+    // Fallback to root folder with a default name if there's an error
+    return DriveApp.createFolder('Invoices_Fallback');
   }
-  return DriveApp.createFolder(folderName);
 }
 
 function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
@@ -223,6 +244,9 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
     }
 
     const company = companies[invoiceData.companyIndex];
+    console.log("Selected company for invoice:", company.name);
+    console.log("Drive folder for this company:", company.driveFolder);
+    
     const contragent = contragents[invoiceData.contragentIndex];
 
     // Calculate dates
@@ -271,13 +295,14 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
     const dateStr = Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'yyyyMMdd');
     const fileName = `${cleanContragentName}_${invoiceData.invoiceNumber}_${dateStr}.pdf`;
 
-    // Save to Drive
-    const folder = getOrCreateInvoicesFolder();
-    folder.createFile(pdf.setName(fileName));
+    // Use the company's custom folder name if available, otherwise use default
+    const folder = getOrCreateInvoicesFolder(company.driveFolder);
+    const createdFile = folder.createFile(pdf.setName(fileName));
 
     // Show success message
     SpreadsheetApp.getUi().alert(
-      'Invoice has been generated successfully!\n\n' + 'Location: Invoices/' + fileName
+      'Invoice has been generated successfully!\n\n' + 
+      `Location: ${folder.getName()}/${fileName}`
     );
   } catch (error) {
     // Type guard for our custom error
