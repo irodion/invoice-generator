@@ -226,9 +226,17 @@
         <span>Subtotal</span>
         <span><?= currency ?> <?= subtotal.toFixed(2) ?></span>
       </div>
+
+      <? if (taxRate > 0) { ?>
+      <div class="total-row">
+        <span>Tax (<?= taxRate ?>%)</span>
+        <span><?= currency ?> <?= taxAmount.toFixed(2) ?></span>
+      </div>
+      <? } ?>
+
       <div class="total-row grand-total">
         <span>Total Due</span>
-        <span><?= currency ?> <?= subtotal.toFixed(2) ?></span>
+        <span><?= currency ?> <?= total.toFixed(2) ?></span>
       </div>
     </div>
 

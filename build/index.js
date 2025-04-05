@@ -125,12 +125,14 @@ function getContragentData() {
                 address: data[i][1],
                 email: data[i][2],
                 phone: data[i][3],
-                driveFolder: data[i][4] || '',
+                tax: validateNumber(data[i][4] || 0, `tax for ${data[i][0]}`), // New tax field
+                driveFolder: data[i][5] || '', // Moved folder field one column to the right
             });
         }
     }
-    // Log the first contragent's driveFolder value for debugging
+    // Log the first contragent's tax and driveFolder values for debugging
     if (contragents.length > 0) {
+        console.log("First contragent's tax rate: " + contragents[0].tax + "%");
         console.log("First contragent's drive folder: " + contragents[0].driveFolder);
     }
     return contragents;
@@ -216,6 +218,7 @@ function generateInvoicePDF(invoiceData) {
         console.log("Drive folder for this company:", company.driveFolder);
         const contragent = contragents[invoiceData.contragentIndex];
         console.log("Selected contragent for invoice:", contragent.companyName);
+        console.log("Tax rate for this contragent:", contragent.tax, "%");
         console.log("Drive folder for this contragent:", contragent.driveFolder);
         // Calculate dates
         const currentDate = new Date();
@@ -237,6 +240,10 @@ function generateInvoicePDF(invoiceData) {
                 total,
             };
         });
+        // Calculate tax amount and total
+        const taxRate = contragent.tax || 0;
+        const taxAmount = (subtotal * taxRate) / 100;
+        const total = subtotal + taxAmount;
         // Set template variables
         Object.assign(template, {
             company,
@@ -247,6 +254,9 @@ function generateInvoicePDF(invoiceData) {
             currency: invoiceData.currency,
             items,
             subtotal,
+            taxRate,
+            taxAmount,
+            total
         });
         // Generate PDF
         const htmlOutput = template.evaluate().getContent();
