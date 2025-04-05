@@ -125,8 +125,13 @@ function getContragentData() {
                 address: data[i][1],
                 email: data[i][2],
                 phone: data[i][3],
+                driveFolder: data[i][4] || '',
             });
         }
+    }
+    // Log the first contragent's driveFolder value for debugging
+    if (contragents.length > 0) {
+        console.log("First contragent's drive folder: " + contragents[0].driveFolder);
     }
     return contragents;
 }
@@ -136,25 +141,54 @@ function cleanNameForFile(name) {
         .toLowerCase()
         .substring(0, 10);
 }
-function getOrCreateInvoicesFolder(folderName = 'Invoices') {
+/**
+ * Creates or finds a folder with the given name in the specified parent folder
+ * @param folderName The name of the folder to create or find
+ * @param parent Optional parent folder. If not provided, uses root Drive folder
+ * @returns The folder object
+ */
+function getOrCreateFolder(folderName, parent) {
+    // Default to root if no parent specified
+    const searchIn = parent || DriveApp;
     // Use default 'Invoices' folder if no name is provided or if it's empty
     const finalFolderName = folderName && folderName.trim() ? folderName.trim() : 'Invoices';
-    console.log("Creating/finding folder with name:", finalFolderName);
+    console.log(`Looking for folder "${finalFolderName}" ${parent ? 'in parent folder' : 'in root'}`);
     try {
-        const folders = DriveApp.getFoldersByName(finalFolderName);
+        const folders = searchIn.getFoldersByName(finalFolderName);
         if (folders.hasNext()) {
             const folder = folders.next();
-            console.log("Found existing folder:", folder.getName(), "with ID:", folder.getId());
+            console.log(`Found existing folder: "${folder.getName()}" with ID: ${folder.getId()}`);
             return folder;
         }
-        const newFolder = DriveApp.createFolder(finalFolderName);
-        console.log("Created new folder:", newFolder.getName(), "with ID:", newFolder.getId());
+        // Create new folder in the appropriate parent
+        const newFolder = parent ?
+            parent.createFolder(finalFolderName) :
+            DriveApp.createFolder(finalFolderName);
+        console.log(`Created new folder: "${newFolder.getName()}" with ID: ${newFolder.getId()}`);
         return newFolder;
     }
     catch (error) {
-        console.error("Error in folder creation:", error);
-        // Fallback to root folder with a default name if there's an error
+        console.error(`Error when creating/finding folder "${finalFolderName}":`, error);
+        // Fallback to a default folder name in the root if there's an error
         return DriveApp.createFolder('Invoices_Fallback');
+    }
+}
+/**
+ * Creates a nested folder structure based on company and client folder names
+ * @param companyFolder The company folder name
+ * @param clientFolder The client folder name
+ * @returns The nested folder where the invoice will be stored
+ */
+function createNestedFolderStructure(companyFolder, clientFolder) {
+    // First create or get the company folder
+    const companyFolderObj = getOrCreateFolder(companyFolder || 'Invoices');
+    // Then create or get the client folder inside the company folder
+    if (clientFolder && clientFolder.trim()) {
+        return getOrCreateFolder(clientFolder, companyFolderObj);
+    }
+    else {
+        // If no client folder specified, just return the company folder
+        return companyFolderObj;
     }
 }
 function generateInvoicePDF(invoiceData) {
@@ -181,6 +215,8 @@ function generateInvoicePDF(invoiceData) {
         console.log("Selected company for invoice:", company.name);
         console.log("Drive folder for this company:", company.driveFolder);
         const contragent = contragents[invoiceData.contragentIndex];
+        console.log("Selected contragent for invoice:", contragent.companyName);
+        console.log("Drive folder for this contragent:", contragent.driveFolder);
         // Calculate dates
         const currentDate = new Date();
         const dueDate = new Date(currentDate);
@@ -220,12 +256,15 @@ function generateInvoicePDF(invoiceData) {
         const cleanContragentName = cleanNameForFile(contragent.companyName);
         const dateStr = Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'yyyyMMdd');
         const fileName = `${cleanContragentName}_${invoiceData.invoiceNumber}_${dateStr}.pdf`;
-        // Use the company's custom folder name if available, otherwise use default
-        const folder = getOrCreateInvoicesFolder(company.driveFolder);
-        const createdFile = folder.createFile(pdf.setName(fileName));
-        // Show success message
+        // Create nested folder structure for the invoice
+        const targetFolder = createNestedFolderStructure(company.driveFolder, contragent.driveFolder);
+        const folderPath = company.driveFolder +
+            (contragent.driveFolder ? '/' + contragent.driveFolder : '');
+        // Store the file in the proper folder
+        const createdFile = targetFolder.createFile(pdf.setName(fileName));
+        // Show success message with the full path
         SpreadsheetApp.getUi().alert('Invoice has been generated successfully!\n\n' +
-            `Location: ${folder.getName()}/${fileName}`);
+            `Location: ${folderPath}/${fileName}`);
     }
     catch (error) {
         // Type guard for our custom error
