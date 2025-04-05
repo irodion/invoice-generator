@@ -170,10 +170,17 @@
       <td class="total-label">SUBTOTAL</td>
       <td class="total-amount"><?= currency ?> <?= subtotal.toFixed(2) ?></td>
     </tr>
+
+    <? if (taxRate > 0) { ?>
     <tr>
-      <td class="total-label">DISCOUNT</td>
-      <td class="total-amount"><?= currency ?> 0.00</td>
+      <td class="total-label">TAX RATE</td>
+      <td class="total-amount"><?= taxRate ?>%</td>
     </tr>
+    <tr>
+      <td class="total-label">TOTAL TAX</td>
+      <td class="total-amount"><?= currency ?> <?= taxAmount.toFixed(2) ?></td>
+    </tr>
+    <? } else { ?>
     <tr>
       <td class="total-label">TAX RATE</td>
       <td class="total-amount">0.00%</td>
@@ -182,12 +189,14 @@
       <td class="total-label">TOTAL TAX</td>
       <td class="total-amount"><?= currency ?> 0.00</td>
     </tr>
+    <? } ?>
+
     <tr>
       <td colspan="2" style="height: 10px;"></td>
     </tr>
     <tr>
       <td class="total-label balance-due">Balance Due</td>
-      <td class="total-amount balance-due"><?= currency ?> <?= subtotal.toFixed(2) ?></td>
+      <td class="total-amount balance-due"><?= currency ?> <?= total.toFixed(2) ?></td>
     </tr>
   </table>
   
