@@ -13,6 +13,7 @@ namespace InvoiceTypes {
     address: string;
     email: string;
     phone: string;
+    paymentMethod: string; // Payment method as specified in requirements
     driveFolder: string;
   }
 
@@ -21,8 +22,12 @@ namespace InvoiceTypes {
     address: string;
     email: string;
     phone: string;
-    tax: number; // Added tax field (percentage)
+    discount: number; // Discount percentage (optional)
+    tax: number; // Tax rate percentage
+    defaultCurrency: string; // Default currency for this contragent
+    personalNote: string; // Optional personal note to include on invoice
     driveFolder: string;
+    invoiceNumber: string; // Current invoice number for this contragent
   }
 
   export interface InvoiceData {
@@ -31,6 +36,9 @@ namespace InvoiceTypes {
     contragentIndex: number;
     currency: string;
     templateId: string;
+    paymentMethod: string; // Payment method for this invoice
+    discount: number; // Discount percentage to apply
+    personalNote: string; // Optional personal note to include
   }
 
   export interface InvoiceItem {
@@ -156,13 +164,15 @@ function getCompanyData(): InvoiceTypes.Company[] {
         address: data[i][1],
         email: data[i][2],
         phone: data[i][3],
-        driveFolder: data[i][4] || '', // Ensure we handle undefined values properly
+        paymentMethod: data[i][4] || '', // Payment method (column 5)
+        driveFolder: data[i][5] || '', // Google Drive folder (column 6)
       });
     }
   }
 
-  // Log the first company's driveFolder value for debugging
+  // Log the first company's info for debugging
   if (companies.length > 0) {
+    console.log("First company's payment method: " + companies[0].paymentMethod);
     console.log("First company's drive folder: " + companies[0].driveFolder);
   }
 
@@ -179,20 +189,28 @@ function getContragentData(): InvoiceTypes.Contragent[] {
     if (data[i][0]) {
       // If company name exists
       contragents.push({
-        companyName: data[i][0],
-        address: data[i][1],
-        email: data[i][2],
-        phone: data[i][3],
-        tax: validateNumber(data[i][4] || 0, `tax for ${data[i][0]}`), // New tax field
-        driveFolder: data[i][5] || '', // Moved folder field one column to the right
+        companyName: data[i][0],                                            // Column 1: Company Name
+        address: data[i][1],                                                // Column 2: Address
+        email: data[i][2],                                                  // Column 3: Email
+        phone: data[i][3],                                                  // Column 4: Phone
+        discount: validateNumber(data[i][4] || 0, `discount for ${data[i][0]}`), // Column 5: Discount
+        tax: validateNumber(data[i][5] || 0, `tax for ${data[i][0]}`),      // Column 6: Tax Rate
+        defaultCurrency: data[i][6] || 'USD',                               // Column 7: Default Currency
+        personalNote: data[i][7] || '',                                     // Column 8: Personal
+        driveFolder: data[i][8] || '',                                      // Column 9: Google Drive Folder
+        invoiceNumber: data[i][9] || '1001',                                // Column 10: Invoice Number
       });
     }
   }
 
-  // Log the first contragent's tax and driveFolder values for debugging
+  // Log the first contragent's values for debugging
   if (contragents.length > 0) {
+    console.log("First contragent's discount: " + contragents[0].discount + "%");
     console.log("First contragent's tax rate: " + contragents[0].tax + "%");
+    console.log("First contragent's default currency: " + contragents[0].defaultCurrency);
+    console.log("First contragent's personal note: " + contragents[0].personalNote);
     console.log("First contragent's drive folder: " + contragents[0].driveFolder);
+    console.log("First contragent's invoice number: " + contragents[0].invoiceNumber);
   }
 
   return contragents;
@@ -203,6 +221,37 @@ function cleanNameForFile(name: string): string {
     .replace(/[^a-zA-Z0-9]/g, '')
     .toLowerCase()
     .substring(0, 10);
+}
+
+/**
+ * Updates the invoice number for the contragent in the spreadsheet
+ * Increments the invoice number by 1 after successful invoice generation
+ * 
+ * @param contragentIndex Index of the contragent in the second sheet
+ * @param currentInvoiceNumber The current invoice number that was used
+ */
+function updateInvoiceNumber(contragentIndex: number, currentInvoiceNumber: string): void {
+  try {
+    // Get the contragents sheet (second sheet)
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
+    
+    // Account for header row, so add 1 to the index
+    const rowIndex = contragentIndex + 1 + 1; // +1 for header, +1 for 0-based to 1-based
+    
+    // Invoice number is in the 10th column (index 9)
+    const columnIndex = 10;
+    
+    // Calculate the next invoice number (increment by 1)
+    const nextInvoiceNumber = parseInt(currentInvoiceNumber, 10) + 1;
+    
+    // Update the cell with the new invoice number
+    sheet.getRange(rowIndex, columnIndex).setValue(nextInvoiceNumber.toString());
+    
+    console.log(`Updated invoice number for contragent index ${contragentIndex} to ${nextInvoiceNumber}`);
+  } catch (error) {
+    console.error('Error updating invoice number:', error);
+    // Don't throw the error since this is not critical to the invoice generation process
+  }
 }
 
 /**
@@ -319,10 +368,19 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
       };
     });
 
-    // Calculate tax amount and total
+    // Get discount from invoice data (or fallback to contragent default)
+    const discountPercentage = typeof invoiceData.discount === 'number' ? 
+                               invoiceData.discount : 
+                               (contragent.discount || 0);
+    
+    // Calculate discount amount
+    const discountAmount = (subtotal * discountPercentage) / 100;
+    const subtotalAfterDiscount = subtotal - discountAmount;
+    
+    // Calculate tax amount and total (tax is applied after discount)
     const taxRate = contragent.tax || 0;
-    const taxAmount = (subtotal * taxRate) / 100;
-    const total = subtotal + taxAmount;
+    const taxAmount = (subtotalAfterDiscount * taxRate) / 100;
+    const total = subtotalAfterDiscount + taxAmount;
 
     // Set template variables
     Object.assign(template, {
@@ -332,11 +390,16 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
       currentDate: Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
       dueDate: Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
       currency: invoiceData.currency,
+      paymentMethod: invoiceData.paymentMethod || company.paymentMethod || 'Bank Transfer',
       items,
       subtotal,
+      discountPercentage,
+      discountAmount,
+      subtotalAfterDiscount,
       taxRate,
       taxAmount,
-      total
+      total,
+      personalNote: invoiceData.personalNote || contragent.personalNote || ''
     });
 
     // Generate PDF
@@ -357,6 +420,9 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
     // Store the file in the proper folder
     const createdFile = targetFolder.createFile(pdf.setName(fileName));
 
+    // Update the invoice number in the sheet
+    updateInvoiceNumber(invoiceData.contragentIndex, invoiceData.invoiceNumber);
+    
     // Show success message with the full path
     SpreadsheetApp.getUi().alert(
       'Invoice has been generated successfully!\n\n' + 

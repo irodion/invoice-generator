@@ -112,6 +112,13 @@
       </div>
 
       <div class="form-group">
+        <label for="paymentMethodSelect">Payment Method:</label>
+        <select id="paymentMethodSelect" required>
+          <option value="">Select payment method...</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label for="contragentSelect">Client:</label>
         <select id="contragentSelect" required>
           <option value="">Select client...</option>
@@ -125,6 +132,16 @@
           <option value="EUR">EUR</option>
           <option value="GBP">GBP</option>
         </select>
+      </div>
+
+      <div class="form-group">
+        <label for="discountInput">Discount (%):</label>
+        <input type="number" id="discountInput" min="0" max="100" step="0.1" value="0">
+      </div>
+
+      <div class="form-group">
+        <label for="personalNoteInput">Personal Note (Optional):</label>
+        <input type="text" id="personalNoteInput" placeholder="e.g., Thank you for your business">
       </div>
 
       <div class="form-group">
@@ -195,32 +212,108 @@
 
       function loadCompanies(companies) {
         var select = document.getElementById('companySelect');
+        var paymentMethodSelect = document.getElementById('paymentMethodSelect');
+        
         companies.forEach(function(company, index) {
           var option = document.createElement('option');
           option.value = index;
           option.text = company.name;
+          option.dataset.paymentMethod = company.paymentMethod;
           select.appendChild(option);
+          
+          // Add payment methods to the payment method dropdown
+          if (company.paymentMethod && !Array.from(paymentMethodSelect.options).some(opt => opt.value === company.paymentMethod)) {
+            var pmOption = document.createElement('option');
+            pmOption.value = company.paymentMethod;
+            pmOption.text = company.paymentMethod;
+            paymentMethodSelect.appendChild(pmOption);
+          }
         });
+        
         // Select first company if available
         if (companies.length > 0) {
           select.value = "0";
+          // Set the default payment method based on the selected company
+          updatePaymentMethod();
         }
+        
         log('Companies loaded into select');
+        
+        // Add event listener to update payment method when company changes
+        select.addEventListener('change', updatePaymentMethod);
+      }
+      
+      function updatePaymentMethod() {
+        var companySelect = document.getElementById('companySelect');
+        var paymentMethodSelect = document.getElementById('paymentMethodSelect');
+        var selectedOption = companySelect.options[companySelect.selectedIndex];
+        
+        if (selectedOption && selectedOption.dataset.paymentMethod) {
+          paymentMethodSelect.value = selectedOption.dataset.paymentMethod;
+        }
       }
 
       function loadContragents(contragents) {
         var select = document.getElementById('contragentSelect');
+        var currencySelect = document.getElementById('currencySelect');
+        var discountInput = document.getElementById('discountInput');
+        var personalNoteInput = document.getElementById('personalNoteInput');
+        var invoiceNumberInput = document.getElementById('invoiceNumber');
+        
         contragents.forEach(function(contragent, index) {
           var option = document.createElement('option');
           option.value = index;
           option.text = contragent.companyName;
+          option.dataset.discount = contragent.discount || 0;
+          option.dataset.currency = contragent.defaultCurrency || 'USD';
+          option.dataset.personalNote = contragent.personalNote || '';
+          option.dataset.invoiceNumber = contragent.invoiceNumber || '1001';
           select.appendChild(option);
         });
+        
         // Select first contragent if available
         if (contragents.length > 0) {
           select.value = "0";
+          updateContragentDetails();
         }
+        
         log('Contragents loaded into select');
+        
+        // Add event listener to update fields when contragent changes
+        select.addEventListener('change', updateContragentDetails);
+      }
+      
+      function updateContragentDetails() {
+        var select = document.getElementById('contragentSelect');
+        var currencySelect = document.getElementById('currencySelect');
+        var discountInput = document.getElementById('discountInput');
+        var personalNoteInput = document.getElementById('personalNoteInput');
+        var invoiceNumberInput = document.getElementById('invoiceNumber');
+        
+        var selectedOption = select.options[select.selectedIndex];
+        
+        if (selectedOption) {
+          // Set default currency from contragent
+          if (selectedOption.dataset.currency) {
+            currencySelect.value = selectedOption.dataset.currency;
+          }
+          
+          // Set discount percentage
+          if (selectedOption.dataset.discount) {
+            discountInput.value = selectedOption.dataset.discount;
+          }
+          
+          // Set personal note
+          if (selectedOption.dataset.personalNote) {
+            personalNoteInput.value = selectedOption.dataset.personalNote;
+          }
+          
+          // Set invoice number (with optional increment)
+          if (selectedOption.dataset.invoiceNumber) {
+            var baseNumber = parseInt(selectedOption.dataset.invoiceNumber, 10);
+            invoiceNumberInput.value = baseNumber;
+          }
+        }
       }
 
       function loadTemplates(templates) {
@@ -267,7 +360,10 @@
           companyIndex: parseInt(document.getElementById('companySelect').value),
           contragentIndex: parseInt(document.getElementById('contragentSelect').value),
           currency: document.getElementById('currencySelect').value,
-          templateId: document.getElementById('templateSelect').value
+          templateId: document.getElementById('templateSelect').value,
+          paymentMethod: document.getElementById('paymentMethodSelect').value,
+          discount: parseFloat(document.getElementById('discountInput').value || 0),
+          personalNote: document.getElementById('personalNoteInput').value || ''
         };
         
         log('Generating invoice with data: ' + JSON.stringify(invoiceData));
@@ -277,6 +373,14 @@
             log('Invoice generated successfully');
             button.classList.remove('loading');
             button.textContent = 'Done!';
+            
+            // Update the invoice number in the UI (for next time)
+            var invoiceNumberInput = document.getElementById('invoiceNumber');
+            var currentNumber = parseInt(invoiceNumberInput.value, 10);
+            if (!isNaN(currentNumber)) {
+              invoiceNumberInput.value = currentNumber + 1;
+            }
+            
             setTimeout(function() {
               google.script.host.close();
             }, 1000);
