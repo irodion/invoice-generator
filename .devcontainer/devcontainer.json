@@ -1,7 +1,38 @@
 {
+  "name": "Google Sheets Invoice Generator",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:0-18",
   "remoteUser": "node",
   "containerUser": "node",
-  "postAttachCommand": "sudo chown -R node /workspaces",
-  "runArgs": ["--user", "node"]
+  "updateContentCommand": "npm install -g @google/clasp && npm install",
+  "postCreateCommand": "bash ./.devcontainer/scripts/initialize.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": true
+        },
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "none"
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
+    }
+  },
+  "runArgs": ["--user", "node"],
+  "mounts": [],
+  "forwardPorts": [],
+  "postAttachCommand": "sudo chown -R node /workspaces"
 }

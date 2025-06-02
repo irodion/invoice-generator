@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspaces/google-sheets-invoice-generator:cached
+      - clasp-config:/home/node/.config/clasp
+      - clasp-rc:/home/node/.clasprc.json
+    command: sleep infinity
+    user: node
+
+volumes:
+  clasp-config:
+  clasp-rc:
