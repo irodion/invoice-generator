@@ -135,19 +135,94 @@ function validateRowData(row: unknown[], rowIndex: number): void {
   validateNumber(row[2], `unit price in row ${rowIndex + 1}`);
 }
 
+/**
+ * Runs when the spreadsheet is opened. Creates the custom menu.
+ */
 function onOpen(): void {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('Invoice Generator').addItem('Generate Invoice', 'showInvoiceDialog').addToUi();
+  ui.createMenu('Invoice Generator')
+    .addItem('Generate Invoice', 'showInvoiceDialog')
+    .addSeparator()
+    .addItem('Initialize Spreadsheet', 'initializeSpreadsheetConfirmation')
+    .addToUi();
+}
+
+/**
+ * Global function to show initialization dialog
+ * This function is called from the menu and delegates to the implementation in initialization.ts
+ */
+function initializeSpreadsheetConfirmation(): void {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    'Initialize Spreadsheet', 
+    'This will create the required "My Info" and "Contragents" sheets for the Invoice Generator. Continue?',
+    ui.ButtonSet.OK_CANCEL
+  );
+  
+  if (response === ui.Button.OK) {
+    initializeSpreadsheet();
+  }
+}
+
+/**
+ * Global declaration of the createSampleInvoiceSheet function
+ * The implementation is in initialization.ts
+ */
+function createSampleInvoiceSheet(spreadsheet: GoogleAppsScript.Spreadsheet.Spreadsheet): void {
+  // This is implemented in initialization.ts
 }
 
 function showInvoiceDialog() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const ui = SpreadsheetApp.getUi();
+  const sheets = spreadsheet.getSheets();
+  const sheetNames = sheets.map(sheet => sheet.getName());
+  
+  // Check if the required sheets exist
+  if (!sheetNames.includes('My Info') || !sheetNames.includes('Contragents')) {
+    const response = ui.alert(
+      'Required Sheets Missing',
+      'The required sheets "My Info" and "Contragents" were not found. Would you like to initialize the spreadsheet now?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response === ui.Button.YES) {
+      initializeSpreadsheet();
+      return;
+    } else {
+      ui.alert(
+        'Cannot Generate Invoice',
+        'Invoice generation requires the "My Info" and "Contragents" sheets to be set up. Please initialize the spreadsheet from the menu before generating invoices.',
+        ui.ButtonSet.OK
+      );
+      return;
+    }
+  }
+  
+  // Check if we have at least 3 sheets (My Info, Contragents, and at least one invoice data sheet)
+  if (sheets.length < 3) {
+    const response = ui.alert(
+      'No Invoice Data Sheets',
+      'You need at least one sheet with invoice data besides "My Info" and "Contragents". Would you like to create a sample invoice sheet?',
+      ui.ButtonSet.YES_NO
+    );
+    
+    if (response === ui.Button.YES) {
+      createSampleInvoiceSheet(spreadsheet);
+      sheets[2].activate(); // Activate the newly created sample sheet
+    } else {
+      return; // User chose not to create a sample sheet, exit
+    }
+  }
+  
+  // Proceed with showing the invoice dialog
   const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
     .evaluate()
     .setWidth(600)
     .setHeight(500)
     .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 
-  SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
+  ui.showModalDialog(html, 'Generate Invoice');
 }
 
 function getCompanyData(): InvoiceTypes.Company[] {

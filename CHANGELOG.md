@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Personal note support for invoices
 - Invoice number auto-incrementing functionality
 - Payment method selection in invoice generation dialog
+- Spreadsheet initialization functionality:
+  - Creates structured "My Info" and "Contragents" sheets with proper formatting
+  - Ensures correct sheet order as per requirements
+  - Adds sample data and helpful instructions
+  - Includes data validation for currency fields
+  - Sets appropriate number formats for numeric fields
 
 ### Changed
 - Updated data retrieval functions to handle new fields from spreadsheets

@@ -42,14 +42,18 @@ The Google Sheet should have the following structure:
 ### Installation
 
 1. Create a new Google Sheet or open an existing one
-2. Set up your sheet structure:
-   - First sheet: Companies information (name, address, etc.)
-   - Second sheet: Clients information (name, address, contact, etc.)
-   - Additional sheets: Invoice line items
 
-3. From the Google Sheet:
+2. From the Google Sheet:
    - Go to Extensions > Apps Script
    - Copy and paste the code from the `build` directory into the Apps Script editor, or use clasp to push the project
+   
+3. Initialize your spreadsheet:
+   - Refresh your Google Sheet to see the custom menu
+   - Click on "Invoice Generator" > "Initialize Spreadsheet"
+   - This will create two sheets:
+     - "My Info": For your company information
+     - "Contragents": For your client/customer information
+   - Sample data will be added to help guide you in filling out the sheets
 
 ### For Developers
 
