@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <base target="_top">
+    <base target="_top" />
     <style>
       body {
         font-family: Arial, sans-serif;
@@ -18,7 +18,8 @@
         margin-bottom: 5px;
         font-weight: bold;
       }
-      select, input {
+      select,
+      input {
         width: 100%;
         padding: 8px;
         margin-bottom: 10px;
@@ -34,6 +35,34 @@
         border: 1px solid #ddd;
         display: none;
       }
+      #loadingOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .loading-content {
+        text-align: center;
+        background-color: white;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+      .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #3498db;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+      }
       .template-description {
         font-size: 0.9em;
         color: #666;
@@ -44,7 +73,7 @@
         margin-top: 25px;
         text-align: center;
       }
-      button[type="submit"] {
+      button[type='submit'] {
         background-color: #1a73e8;
         color: white;
         padding: 12px 30px;
@@ -54,18 +83,18 @@
         font-weight: 500;
         cursor: pointer;
         min-width: 200px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
         transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         position: relative;
         display: inline-flex;
         align-items: center;
         justify-content: center;
       }
-      button[type="submit"].loading {
+      button[type='submit'].loading {
         background-color: #1557a0;
         cursor: wait;
       }
-      button[type="submit"].loading::after {
+      button[type='submit'].loading::after {
         content: '';
         position: absolute;
         width: 20px;
@@ -77,19 +106,23 @@
         animation: spin 1s linear infinite;
       }
       @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
       }
-      button[type="submit"]:hover {
+      button[type='submit']:hover {
         background-color: #185abc;
-        box-shadow: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.16), 0 3px 6px rgba(0, 0, 0, 0.23);
       }
-      button[type="submit"]:active {
+      button[type='submit']:active {
         background-color: #1557a0;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
         transform: translateY(1px);
       }
-      button[type="submit"]:disabled {
+      button[type='submit']:disabled {
         background-color: #ccc;
         cursor: not-allowed;
         box-shadow: none;
@@ -101,13 +134,20 @@
     <form id="invoiceForm" onsubmit="generateInvoice(); return false;">
       <div class="form-group">
         <label for="invoiceNumber">Invoice Number:</label>
-        <input type="text" id="invoiceNumber" required>
+        <input type="text" id="invoiceNumber" required />
       </div>
 
       <div class="form-group">
         <label for="companySelect">Your Company:</label>
         <select id="companySelect" required>
           <option value="">Select company...</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="paymentMethodSelect">Payment Method:</label>
+        <select id="paymentMethodSelect" required>
+          <option value="">Select payment method...</option>
         </select>
       </div>
 
@@ -125,6 +165,16 @@
           <option value="EUR">EUR</option>
           <option value="GBP">GBP</option>
         </select>
+      </div>
+
+      <div class="form-group">
+        <label for="discountInput">Discount (%):</label>
+        <input type="number" id="discountInput" min="0" max="100" step="0.1" value="0" />
+      </div>
+
+      <div class="form-group">
+        <label for="personalNoteInput">Personal Note (Optional):</label>
+        <input type="text" id="personalNoteInput" placeholder="e.g., Thank you for your business" />
       </div>
 
       <div class="form-group">
@@ -150,20 +200,20 @@
       }
 
       // Initialize form when the page loads
-      window.onload = function() {
+      window.onload = function () {
         log('Page loaded');
-        
+
         // Set default currency
-        document.getElementById('currencySelect').value = "USD";
-        
+        document.getElementById('currencySelect').value = 'USD';
+
         // Load templates
         log('Requesting templates...');
         google.script.run
-          .withSuccessHandler(function(templates) {
+          .withSuccessHandler(function (templates) {
             log('Templates received: ' + JSON.stringify(templates));
             loadTemplates(templates);
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             log('Error loading templates: ' + error);
           })
           .getTemplatesList();
@@ -171,11 +221,11 @@
         // Load companies
         log('Requesting companies...');
         google.script.run
-          .withSuccessHandler(function(companies) {
+          .withSuccessHandler(function (companies) {
             log('Companies received: ' + JSON.stringify(companies));
             loadCompanies(companies);
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             log('Error loading companies: ' + error);
           })
           .getCompanyData();
@@ -183,11 +233,11 @@
         // Load contragents
         log('Requesting contragents...');
         google.script.run
-          .withSuccessHandler(function(contragents) {
+          .withSuccessHandler(function (contragents) {
             log('Contragents received: ' + JSON.stringify(contragents));
             loadContragents(contragents);
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             log('Error loading contragents: ' + error);
           })
           .getContragentData();
@@ -195,37 +245,118 @@
 
       function loadCompanies(companies) {
         var select = document.getElementById('companySelect');
-        companies.forEach(function(company, index) {
+        var paymentMethodSelect = document.getElementById('paymentMethodSelect');
+
+        companies.forEach(function (company, index) {
           var option = document.createElement('option');
           option.value = index;
           option.text = company.name;
+          option.dataset.paymentMethod = company.paymentMethod;
           select.appendChild(option);
+
+          // Add payment methods to the payment method dropdown
+          if (
+            company.paymentMethod &&
+            !Array.from(paymentMethodSelect.options).some(
+              opt => opt.value === company.paymentMethod
+            )
+          ) {
+            var pmOption = document.createElement('option');
+            pmOption.value = company.paymentMethod;
+            pmOption.text = company.paymentMethod;
+            paymentMethodSelect.appendChild(pmOption);
+          }
         });
+
         // Select first company if available
         if (companies.length > 0) {
-          select.value = "0";
+          select.value = '0';
+          // Set the default payment method based on the selected company
+          updatePaymentMethod();
         }
+
         log('Companies loaded into select');
+
+        // Add event listener to update payment method when company changes
+        select.addEventListener('change', updatePaymentMethod);
+      }
+
+      function updatePaymentMethod() {
+        var companySelect = document.getElementById('companySelect');
+        var paymentMethodSelect = document.getElementById('paymentMethodSelect');
+        var selectedOption = companySelect.options[companySelect.selectedIndex];
+
+        if (selectedOption && selectedOption.dataset.paymentMethod) {
+          paymentMethodSelect.value = selectedOption.dataset.paymentMethod;
+        }
       }
 
       function loadContragents(contragents) {
         var select = document.getElementById('contragentSelect');
-        contragents.forEach(function(contragent, index) {
+        var currencySelect = document.getElementById('currencySelect');
+        var discountInput = document.getElementById('discountInput');
+        var personalNoteInput = document.getElementById('personalNoteInput');
+        var invoiceNumberInput = document.getElementById('invoiceNumber');
+
+        contragents.forEach(function (contragent, index) {
           var option = document.createElement('option');
           option.value = index;
           option.text = contragent.companyName;
+          option.dataset.discount = contragent.discount || 0;
+          option.dataset.currency = contragent.defaultCurrency || 'USD';
+          option.dataset.personalNote = contragent.personalNote || '';
+          option.dataset.invoiceNumber = contragent.invoiceNumber || '1001';
           select.appendChild(option);
         });
+
         // Select first contragent if available
         if (contragents.length > 0) {
-          select.value = "0";
+          select.value = '0';
+          updateContragentDetails();
         }
+
         log('Contragents loaded into select');
+
+        // Add event listener to update fields when contragent changes
+        select.addEventListener('change', updateContragentDetails);
+      }
+
+      function updateContragentDetails() {
+        var select = document.getElementById('contragentSelect');
+        var currencySelect = document.getElementById('currencySelect');
+        var discountInput = document.getElementById('discountInput');
+        var personalNoteInput = document.getElementById('personalNoteInput');
+        var invoiceNumberInput = document.getElementById('invoiceNumber');
+
+        var selectedOption = select.options[select.selectedIndex];
+
+        if (selectedOption) {
+          // Set default currency from contragent
+          if (selectedOption.dataset.currency) {
+            currencySelect.value = selectedOption.dataset.currency;
+          }
+
+          // Set discount percentage
+          if (selectedOption.dataset.discount) {
+            discountInput.value = selectedOption.dataset.discount;
+          }
+
+          // Set personal note
+          if (selectedOption.dataset.personalNote) {
+            personalNoteInput.value = selectedOption.dataset.personalNote;
+          }
+
+          // Set invoice number (with optional increment)
+          if (selectedOption.dataset.invoiceNumber) {
+            var baseNumber = parseInt(selectedOption.dataset.invoiceNumber, 10);
+            invoiceNumberInput.value = baseNumber;
+          }
+        }
       }
 
       function loadTemplates(templates) {
         var select = document.getElementById('templateSelect');
-        templates.forEach(function(template) {
+        templates.forEach(function (template) {
           var option = document.createElement('option');
           option.value = template.id;
           option.text = template.name;
@@ -238,7 +369,7 @@
           updateTemplateDescription();
         }
         log('Templates loaded into select');
-        
+
         select.addEventListener('change', updateTemplateDescription);
       }
 
@@ -256,33 +387,74 @@
       function generateInvoice() {
         var button = document.getElementById('generateButton');
         var originalText = button.textContent;
-        
+        var form = document.getElementById('invoiceForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+          form.reportValidity();
+          return false;
+        }
+
+        // Show loading overlay
+        var loadingOverlay = document.createElement('div');
+        loadingOverlay.id = 'loadingOverlay';
+        loadingOverlay.innerHTML = `
+          <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Generating invoice...</p>
+          </div>
+        `;
+        document.body.appendChild(loadingOverlay);
+
         // Disable the button and show loading state
         button.disabled = true;
         button.classList.add('loading');
         button.textContent = 'Generating...';
-        
+
         var invoiceData = {
           invoiceNumber: document.getElementById('invoiceNumber').value,
           companyIndex: parseInt(document.getElementById('companySelect').value),
           contragentIndex: parseInt(document.getElementById('contragentSelect').value),
           currency: document.getElementById('currencySelect').value,
-          templateId: document.getElementById('templateSelect').value
+          templateId: document.getElementById('templateSelect').value,
+          paymentMethod: document.getElementById('paymentMethodSelect').value,
+          discount: parseFloat(document.getElementById('discountInput').value || 0),
+          personalNote: document.getElementById('personalNoteInput').value || '',
         };
-        
+
         log('Generating invoice with data: ' + JSON.stringify(invoiceData));
 
         google.script.run
-          .withSuccessHandler(function() {
+          .withSuccessHandler(function () {
             log('Invoice generated successfully');
+            // Remove loading overlay
+            var overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+              document.body.removeChild(overlay);
+            }
+
             button.classList.remove('loading');
             button.textContent = 'Done!';
-            setTimeout(function() {
+
+            // Update the invoice number in the UI (for next time)
+            var invoiceNumberInput = document.getElementById('invoiceNumber');
+            var currentNumber = parseInt(invoiceNumberInput.value, 10);
+            if (!isNaN(currentNumber)) {
+              invoiceNumberInput.value = currentNumber + 1;
+            }
+
+            setTimeout(function () {
               google.script.host.close();
             }, 1000);
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             log('Error generating invoice: ' + error);
+            // Remove loading overlay
+            var overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+              document.body.removeChild(overlay);
+            }
+
             button.disabled = false;
             button.classList.remove('loading');
             button.textContent = originalText;

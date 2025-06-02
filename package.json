@@ -4,7 +4,7 @@
   "description": "A Google Apps Script project to generate invoices from Google Sheets data",
   "main": "build/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node copy-templates.js",
     "watch": "tsc --watch",
     "start": "npm run watch",
     "push": "npm run build && clasp push",
@@ -18,7 +18,8 @@
     "lint:fix": "eslint 'src/**/*.{js,ts}' --fix",
     "format": "prettier --write 'src/**/*.{js,ts,json,html}'",
     "format:check": "prettier --check 'src/**/*.{js,ts,json,html}'",
-    "prepush": "npm run lint:fix && npm run format && npm run build"
+    "prepush": "npm run lint:fix && npm run format && npm run build",
+    "copy-templates": "node copy-templates.js"
   },
   "keywords": [
     "google-apps-script",

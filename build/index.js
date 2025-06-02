@@ -77,17 +77,63 @@ function validateRowData(row, rowIndex) {
     validateNumber(row[1], `quantity in row ${rowIndex + 1}`);
     validateNumber(row[2], `unit price in row ${rowIndex + 1}`);
 }
+/**
+ * Runs when the spreadsheet is opened. Creates the custom menu.
+ */
 function onOpen() {
     const ui = SpreadsheetApp.getUi();
-    ui.createMenu('Invoice Generator').addItem('Generate Invoice', 'showInvoiceDialog').addToUi();
+    ui.createMenu('Invoice Generator')
+        .addItem('Generate Invoice', 'showInvoiceDialog')
+        .addSeparator()
+        .addItem('Initialize Spreadsheet', 'initializeSpreadsheetConfirmation')
+        .addToUi();
+}
+/**
+ * Global function to show initialization dialog
+ * This function is called from the menu and delegates to the implementation in initialization.ts
+ */
+function initializeSpreadsheetConfirmation() {
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert('Initialize Spreadsheet', 'This will create the required "My Info" and "Contragents" sheets for the Invoice Generator. Continue?', ui.ButtonSet.OK_CANCEL);
+    if (response === ui.Button.OK) {
+        initializeSpreadsheet();
+    }
 }
 function showInvoiceDialog() {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    const sheets = spreadsheet.getSheets();
+    const sheetNames = sheets.map(sheet => sheet.getName());
+    // Check if the required sheets exist
+    if (!sheetNames.includes('My Info') || !sheetNames.includes('Contragents')) {
+        const response = ui.alert('Required Sheets Missing', 'The required sheets "My Info" and "Contragents" were not found. Would you like to initialize the spreadsheet now?', ui.ButtonSet.YES_NO);
+        if (response === ui.Button.YES) {
+            initializeSpreadsheet();
+            return;
+        }
+        else {
+            ui.alert('Cannot Generate Invoice', 'Invoice generation requires the "My Info" and "Contragents" sheets to be set up. Please initialize the spreadsheet from the menu before generating invoices.', ui.ButtonSet.OK);
+            return;
+        }
+    }
+    // Check if we have at least 3 sheets (My Info, Contragents, and at least one invoice data sheet)
+    if (sheets.length < 3) {
+        const response = ui.alert('No Invoice Data Sheets', 'You need at least one sheet with invoice data besides "My Info" and "Contragents". Would you like to create a sample invoice sheet?', ui.ButtonSet.YES_NO);
+        if (response === ui.Button.YES) {
+            createSampleInvoiceSheet(spreadsheet);
+            sheets[2].activate(); // Activate the newly created sample sheet
+        }
+        else {
+            return; // User chose not to create a sample sheet, exit
+        }
+    }
+    // Proceed with showing the invoice dialog
     const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
         .evaluate()
         .setWidth(600)
         .setHeight(500)
         .setSandboxMode(HtmlService.SandboxMode.IFRAME);
-    SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
+    ui.showModalDialog(html, 'Generate Invoice');
 }
 function getCompanyData() {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
@@ -102,12 +148,14 @@ function getCompanyData() {
                 address: data[i][1],
                 email: data[i][2],
                 phone: data[i][3],
-                driveFolder: data[i][4] || '', // Ensure we handle undefined values properly
+                paymentMethod: data[i][4] || '', // Payment method (column 5)
+                driveFolder: data[i][5] || '', // Google Drive folder (column 6)
             });
         }
     }
-    // Log the first company's driveFolder value for debugging
+    // Log the first company's info for debugging
     if (companies.length > 0) {
+        console.log("First company's payment method: " + companies[0].paymentMethod);
         console.log("First company's drive folder: " + companies[0].driveFolder);
     }
     return companies;
@@ -121,19 +169,27 @@ function getContragentData() {
         if (data[i][0]) {
             // If company name exists
             contragents.push({
-                companyName: data[i][0],
-                address: data[i][1],
-                email: data[i][2],
-                phone: data[i][3],
-                tax: validateNumber(data[i][4] || 0, `tax for ${data[i][0]}`), // New tax field
-                driveFolder: data[i][5] || '', // Moved folder field one column to the right
+                companyName: data[i][0], // Column 1: Company Name
+                address: data[i][1], // Column 2: Address
+                email: data[i][2], // Column 3: Email
+                phone: data[i][3], // Column 4: Phone
+                discount: validateNumber(data[i][4] || 0, `discount for ${data[i][0]}`), // Column 5: Discount
+                tax: validateNumber(data[i][5] || 0, `tax for ${data[i][0]}`), // Column 6: Tax Rate
+                defaultCurrency: data[i][6] || 'USD', // Column 7: Default Currency
+                personalNote: data[i][7] || '', // Column 8: Personal
+                driveFolder: data[i][8] || '', // Column 9: Google Drive Folder
+                invoiceNumber: data[i][9] || '1001', // Column 10: Invoice Number
             });
         }
     }
-    // Log the first contragent's tax and driveFolder values for debugging
+    // Log the first contragent's values for debugging
     if (contragents.length > 0) {
-        console.log("First contragent's tax rate: " + contragents[0].tax + "%");
+        console.log("First contragent's discount: " + contragents[0].discount + '%');
+        console.log("First contragent's tax rate: " + contragents[0].tax + '%');
+        console.log("First contragent's default currency: " + contragents[0].defaultCurrency);
+        console.log("First contragent's personal note: " + contragents[0].personalNote);
         console.log("First contragent's drive folder: " + contragents[0].driveFolder);
+        console.log("First contragent's invoice number: " + contragents[0].invoiceNumber);
     }
     return contragents;
 }
@@ -142,6 +198,32 @@ function cleanNameForFile(name) {
         .replace(/[^a-zA-Z0-9]/g, '')
         .toLowerCase()
         .substring(0, 10);
+}
+/**
+ * Updates the invoice number for the contragent in the spreadsheet
+ * Increments the invoice number by 1 after successful invoice generation
+ *
+ * @param contragentIndex Index of the contragent in the second sheet
+ * @param currentInvoiceNumber The current invoice number that was used
+ */
+function updateInvoiceNumber(contragentIndex, currentInvoiceNumber) {
+    try {
+        // Get the contragents sheet (second sheet)
+        const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
+        // Account for header row, so add 1 to the index
+        const rowIndex = contragentIndex + 1 + 1; // +1 for header, +1 for 0-based to 1-based
+        // Invoice number is in the 10th column (index 9)
+        const columnIndex = 10;
+        // Calculate the next invoice number (increment by 1)
+        const nextInvoiceNumber = parseInt(currentInvoiceNumber, 10) + 1;
+        // Update the cell with the new invoice number
+        sheet.getRange(rowIndex, columnIndex).setValue(nextInvoiceNumber.toString());
+        console.log(`Updated invoice number for contragent index ${contragentIndex} to ${nextInvoiceNumber}`);
+    }
+    catch (error) {
+        console.error('Error updating invoice number:', error);
+        // Don't throw the error since this is not critical to the invoice generation process
+    }
 }
 /**
  * Creates or finds a folder with the given name in the specified parent folder
@@ -163,9 +245,9 @@ function getOrCreateFolder(folderName, parent) {
             return folder;
         }
         // Create new folder in the appropriate parent
-        const newFolder = parent ?
-            parent.createFolder(finalFolderName) :
-            DriveApp.createFolder(finalFolderName);
+        const newFolder = parent
+            ? parent.createFolder(finalFolderName)
+            : DriveApp.createFolder(finalFolderName);
         console.log(`Created new folder: "${newFolder.getName()}" with ID: ${newFolder.getId()}`);
         return newFolder;
     }
@@ -214,12 +296,12 @@ function generateInvoicePDF(invoiceData) {
             throw new Error('Invalid contragent selected.');
         }
         const company = companies[invoiceData.companyIndex];
-        console.log("Selected company for invoice:", company.name);
-        console.log("Drive folder for this company:", company.driveFolder);
+        console.log('Selected company for invoice:', company.name);
+        console.log('Drive folder for this company:', company.driveFolder);
         const contragent = contragents[invoiceData.contragentIndex];
-        console.log("Selected contragent for invoice:", contragent.companyName);
-        console.log("Tax rate for this contragent:", contragent.tax, "%");
-        console.log("Drive folder for this contragent:", contragent.driveFolder);
+        console.log('Selected contragent for invoice:', contragent.companyName);
+        console.log('Tax rate for this contragent:', contragent.tax, '%');
+        console.log('Drive folder for this contragent:', contragent.driveFolder);
         // Calculate dates
         const currentDate = new Date();
         const dueDate = new Date(currentDate);
@@ -240,10 +322,15 @@ function generateInvoicePDF(invoiceData) {
                 total,
             };
         });
-        // Calculate tax amount and total
+        // Get discount from invoice data (or fallback to contragent default)
+        const discountPercentage = typeof invoiceData.discount === 'number' ? invoiceData.discount : contragent.discount || 0;
+        // Calculate discount amount
+        const discountAmount = (subtotal * discountPercentage) / 100;
+        const subtotalAfterDiscount = subtotal - discountAmount;
+        // Calculate tax amount and total (tax is applied after discount)
         const taxRate = contragent.tax || 0;
-        const taxAmount = (subtotal * taxRate) / 100;
-        const total = subtotal + taxAmount;
+        const taxAmount = (subtotalAfterDiscount * taxRate) / 100;
+        const total = subtotalAfterDiscount + taxAmount;
         // Set template variables
         Object.assign(template, {
             company,
@@ -252,11 +339,16 @@ function generateInvoicePDF(invoiceData) {
             currentDate: Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
             dueDate: Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
             currency: invoiceData.currency,
+            paymentMethod: invoiceData.paymentMethod || company.paymentMethod || 'Bank Transfer',
             items,
             subtotal,
+            discountPercentage,
+            discountAmount,
+            subtotalAfterDiscount,
             taxRate,
             taxAmount,
-            total
+            total,
+            personalNote: invoiceData.personalNote || contragent.personalNote || '',
         });
         // Generate PDF
         const htmlOutput = template.evaluate().getContent();
@@ -268,13 +360,29 @@ function generateInvoicePDF(invoiceData) {
         const fileName = `${cleanContragentName}_${invoiceData.invoiceNumber}_${dateStr}.pdf`;
         // Create nested folder structure for the invoice
         const targetFolder = createNestedFolderStructure(company.driveFolder, contragent.driveFolder);
-        const folderPath = company.driveFolder +
-            (contragent.driveFolder ? '/' + contragent.driveFolder : '');
+        const folderPath = company.driveFolder + (contragent.driveFolder ? '/' + contragent.driveFolder : '');
         // Store the file in the proper folder
         const createdFile = targetFolder.createFile(pdf.setName(fileName));
-        // Show success message with the full path
-        SpreadsheetApp.getUi().alert('Invoice has been generated successfully!\n\n' +
-            `Location: ${folderPath}/${fileName}`);
+        // Update the invoice number in the sheet
+        updateInvoiceNumber(invoiceData.contragentIndex, invoiceData.invoiceNumber);
+        // Get the URL of the created file
+        const fileUrl = createdFile.getUrl();
+        // Show success message with the full path and clickable link
+        SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(`<div style="padding: 20px; font-family: Arial, sans-serif;">
+          <h2 style="color: #4CAF50;">Invoice has been generated successfully!</h2>
+          <p><strong>Location:</strong> ${folderPath}/${fileName}</p>
+          <p><a href="${fileUrl}" target="_blank" style="color: #2196F3; text-decoration: none; font-weight: bold;">
+            Click here to open the invoice
+          </a></p>
+          <div style="text-align: center; margin-top: 20px;">
+            <button onclick="google.script.host.close()"
+                    style="background-color: #4CAF50; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px;">
+              Close
+            </button>
+          </div>
+        </div>`)
+            .setWidth(400)
+            .setHeight(250), 'Invoice Generated');
     }
     catch (error) {
         // Type guard for our custom error
