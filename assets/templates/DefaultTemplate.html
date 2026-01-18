@@ -60,7 +60,11 @@
         </table>
         
         <div class="total">
-          <strong>Total Amount: <?= currency ?> <?= subtotal.toFixed(2) ?></strong>
+          <p>Subtotal: <?= currency ?> <?= subtotal.toFixed(2) ?></p>
+          <? if (taxRate > 0) { ?>
+          <p>Tax (<?= taxRate ?>%): <?= currency ?> <?= taxAmount.toFixed(2) ?></p>
+          <? } ?>
+          <p><strong>Total Amount: <?= currency ?> <?= total.toFixed(2) ?></strong></p>
         </div>
         
         <div class="payment-terms">

@@ -40,7 +40,6 @@ const TEMPLATES = [
 ];
 // Template management functions
 function getTemplatesList() {
-    console.info('>>> TEMPLATES <<< ', TEMPLATES);
     return TEMPLATES;
 }
 function getTemplateById(id) {
@@ -57,25 +56,47 @@ function loadTemplate(templateId) {
 function validateNumber(value, fieldName) {
     const num = Number(value);
     if (isNaN(num)) {
-        throw new Error(`Invalid ${fieldName}: must be a number`);
+        throw new InvoiceTypes.InvoiceError(`Invalid ${fieldName}: must be a number`);
     }
     return num;
 }
 function validateSelection(selection) {
     if (!selection) {
-        throw new Error('No range selected. Please select invoice items.');
+        throw new InvoiceTypes.InvoiceError('No range selected. Please select invoice items.');
     }
     return selection;
 }
 function validateRowData(row, rowIndex) {
     if (row.length < 3) {
-        throw new Error(`Row ${rowIndex + 1} is missing required fields.`);
+        throw new InvoiceTypes.InvoiceError(`Row ${rowIndex + 1} is missing required fields.`);
     }
     if (!row[0]) {
-        throw new Error(`Row ${rowIndex + 1} is missing a description.`);
+        throw new InvoiceTypes.InvoiceError(`Row ${rowIndex + 1} is missing a description.`);
     }
     validateNumber(row[1], `quantity in row ${rowIndex + 1}`);
     validateNumber(row[2], `unit price in row ${rowIndex + 1}`);
+}
+function validateSheetExists(sheets, index, sheetName) {
+    if (!sheets[index]) {
+        throw new InvoiceTypes.InvoiceError(`Missing required sheet: "${sheetName}" (Sheet ${index + 1}). ` +
+            'Please ensure the spreadsheet has the correct structure.');
+    }
+    return sheets[index];
+}
+// HTML escaping helper to prevent XSS/broken PDFs
+function escapeHtml(text) {
+    if (!text)
+        return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+// Safe array access helper
+function safeGet(arr, index, defaultValue) {
+    return arr[index] !== undefined ? arr[index] : defaultValue;
 }
 function onOpen() {
     const ui = SpreadsheetApp.getUi();
@@ -90,50 +111,46 @@ function showInvoiceDialog() {
     SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
 }
 function getCompanyData() {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+    const sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+    const sheet = validateSheetExists(sheets, 0, 'Companies');
     const data = sheet.getDataRange().getValues();
     const companies = [];
     // Skip header row
     for (let i = 1; i < data.length; i++) {
-        if (data[i][0]) {
+        const row = data[i];
+        if (row[0]) {
             // If name exists
             companies.push({
-                name: data[i][0],
-                address: data[i][1],
-                email: data[i][2],
-                phone: data[i][3],
-                driveFolder: data[i][4] || '', // Ensure we handle undefined values properly
+                name: escapeHtml(String(safeGet(row, 0, ''))),
+                address: escapeHtml(String(safeGet(row, 1, ''))),
+                email: escapeHtml(String(safeGet(row, 2, ''))),
+                phone: escapeHtml(String(safeGet(row, 3, ''))),
+                driveFolder: String(safeGet(row, 4, '')),
             });
         }
-    }
-    // Log the first company's driveFolder value for debugging
-    if (companies.length > 0) {
-        console.log("First company's drive folder: " + companies[0].driveFolder);
     }
     return companies;
 }
 function getContragentData() {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[1];
+    const sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
+    const sheet = validateSheetExists(sheets, 1, 'Clients');
     const data = sheet.getDataRange().getValues();
     const contragents = [];
     // Skip header row
     for (let i = 1; i < data.length; i++) {
-        if (data[i][0]) {
+        const row = data[i];
+        if (row[0]) {
             // If company name exists
+            const companyName = String(safeGet(row, 0, ''));
             contragents.push({
-                companyName: data[i][0],
-                address: data[i][1],
-                email: data[i][2],
-                phone: data[i][3],
-                tax: validateNumber(data[i][4] || 0, `tax for ${data[i][0]}`), // New tax field
-                driveFolder: data[i][5] || '', // Moved folder field one column to the right
+                companyName: escapeHtml(companyName),
+                address: escapeHtml(String(safeGet(row, 1, ''))),
+                email: escapeHtml(String(safeGet(row, 2, ''))),
+                phone: escapeHtml(String(safeGet(row, 3, ''))),
+                tax: validateNumber(safeGet(row, 4, 0), `tax for ${companyName}`),
+                driveFolder: String(safeGet(row, 5, '')),
             });
         }
-    }
-    // Log the first contragent's tax and driveFolder values for debugging
-    if (contragents.length > 0) {
-        console.log("First contragent's tax rate: " + contragents[0].tax + "%");
-        console.log("First contragent's drive folder: " + contragents[0].driveFolder);
     }
     return contragents;
 }
@@ -142,6 +159,64 @@ function cleanNameForFile(name) {
         .replace(/[^a-zA-Z0-9]/g, '')
         .toLowerCase()
         .substring(0, 10);
+}
+/**
+ * Generates a sequential invoice number in the format INV-YYYY-NNNN
+ * @returns The generated invoice number
+ */
+function generateInvoiceNumber() {
+    const props = PropertiesService.getDocumentProperties();
+    const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
+    const newNum = lastNum + 1;
+    props.setProperty('lastInvoiceNum', String(newNum));
+    const year = new Date().getFullYear();
+    return `INV-${year}-${String(newNum).padStart(4, '0')}`;
+}
+/**
+ * Gets the next invoice number without incrementing the counter (for preview)
+ * @returns The next invoice number that would be generated
+ */
+function getNextInvoiceNumber() {
+    const props = PropertiesService.getDocumentProperties();
+    const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
+    const nextNum = lastNum + 1;
+    const year = new Date().getFullYear();
+    return `INV-${year}-${String(nextNum).padStart(4, '0')}`;
+}
+/**
+ * Logs a generated invoice to the Invoice Log sheet
+ */
+function logInvoice(invoiceNumber, companyName, clientName, total, currency, fileName, fileUrl) {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = spreadsheet.getSheetByName('Invoice Log');
+    if (!logSheet) {
+        logSheet = spreadsheet.insertSheet('Invoice Log');
+        logSheet.appendRow([
+            'Date',
+            'Invoice #',
+            'Company',
+            'Client',
+            'Total',
+            'Currency',
+            'File Name',
+            'File URL',
+        ]);
+        // Format header row
+        const headerRange = logSheet.getRange(1, 1, 1, 8);
+        headerRange.setFontWeight('bold');
+        headerRange.setBackground('#f3f3f3');
+        logSheet.setFrozenRows(1);
+    }
+    logSheet.appendRow([
+        new Date(),
+        invoiceNumber,
+        companyName,
+        clientName,
+        total,
+        currency,
+        fileName,
+        fileUrl,
+    ]);
 }
 /**
  * Creates or finds a folder with the given name in the specified parent folder
@@ -154,24 +229,17 @@ function getOrCreateFolder(folderName, parent) {
     const searchIn = parent || DriveApp;
     // Use default 'Invoices' folder if no name is provided or if it's empty
     const finalFolderName = folderName && folderName.trim() ? folderName.trim() : 'Invoices';
-    console.log(`Looking for folder "${finalFolderName}" ${parent ? 'in parent folder' : 'in root'}`);
     try {
         const folders = searchIn.getFoldersByName(finalFolderName);
         if (folders.hasNext()) {
-            const folder = folders.next();
-            console.log(`Found existing folder: "${folder.getName()}" with ID: ${folder.getId()}`);
-            return folder;
+            return folders.next();
         }
         // Create new folder in the appropriate parent
-        const newFolder = parent ?
-            parent.createFolder(finalFolderName) :
-            DriveApp.createFolder(finalFolderName);
-        console.log(`Created new folder: "${newFolder.getName()}" with ID: ${newFolder.getId()}`);
-        return newFolder;
+        return parent ? parent.createFolder(finalFolderName) : DriveApp.createFolder(finalFolderName);
     }
     catch (error) {
-        console.error(`Error when creating/finding folder "${finalFolderName}":`, error);
         // Fallback to a default folder name in the root if there's an error
+        console.error(`Error creating folder "${finalFolderName}":`, error);
         return DriveApp.createFolder('Invoices_Fallback');
     }
 }
@@ -207,23 +275,19 @@ function generateInvoicePDF(invoiceData) {
         // Get company and contragent data
         const companies = getCompanyData();
         const contragents = getContragentData();
-        if (invoiceData.companyIndex >= companies.length) {
-            throw new Error('Invalid company selected.');
+        if (invoiceData.companyIndex < 0 || invoiceData.companyIndex >= companies.length) {
+            throw new InvoiceTypes.InvoiceError('Invalid company selected. Please refresh and try again.');
         }
-        if (invoiceData.contragentIndex >= contragents.length) {
-            throw new Error('Invalid contragent selected.');
+        if (invoiceData.contragentIndex < 0 || invoiceData.contragentIndex >= contragents.length) {
+            throw new InvoiceTypes.InvoiceError('Invalid client selected. Please refresh and try again.');
         }
         const company = companies[invoiceData.companyIndex];
-        console.log("Selected company for invoice:", company.name);
-        console.log("Drive folder for this company:", company.driveFolder);
         const contragent = contragents[invoiceData.contragentIndex];
-        console.log("Selected contragent for invoice:", contragent.companyName);
-        console.log("Tax rate for this contragent:", contragent.tax, "%");
-        console.log("Drive folder for this contragent:", contragent.driveFolder);
-        // Calculate dates
+        // Calculate dates using payment terms
         const currentDate = new Date();
         const dueDate = new Date(currentDate);
-        dueDate.setMonth(dueDate.getMonth() + 1);
+        const paymentDays = invoiceData.paymentDays || 30; // Default to Net 30
+        dueDate.setDate(dueDate.getDate() + paymentDays);
         // Load the template
         const template = loadTemplate(invoiceData.templateId);
         // Process items and calculate totals
@@ -231,13 +295,13 @@ function generateInvoicePDF(invoiceData) {
         const items = selectedRows.map((row, index) => {
             const quantity = validateNumber(row[1], `quantity in row ${index + 1}`);
             const unitPrice = validateNumber(row[2], `unit price in row ${index + 1}`);
-            const total = quantity * unitPrice;
-            subtotal += total;
+            const itemTotal = quantity * unitPrice;
+            subtotal += itemTotal;
             return {
-                description: String(row[0]),
+                description: escapeHtml(String(row[0])),
                 quantity,
                 unitPrice,
-                total,
+                total: itemTotal,
             };
         });
         // Calculate tax amount and total
@@ -248,7 +312,7 @@ function generateInvoicePDF(invoiceData) {
         Object.assign(template, {
             company,
             contragent,
-            invoiceNumber: invoiceData.invoiceNumber,
+            invoiceNumber: escapeHtml(invoiceData.invoiceNumber),
             currentDate: Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
             dueDate: Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
             currency: invoiceData.currency,
@@ -256,7 +320,7 @@ function generateInvoicePDF(invoiceData) {
             subtotal,
             taxRate,
             taxAmount,
-            total
+            total,
         });
         // Generate PDF
         const htmlOutput = template.evaluate().getContent();
@@ -268,13 +332,20 @@ function generateInvoicePDF(invoiceData) {
         const fileName = `${cleanContragentName}_${invoiceData.invoiceNumber}_${dateStr}.pdf`;
         // Create nested folder structure for the invoice
         const targetFolder = createNestedFolderStructure(company.driveFolder, contragent.driveFolder);
-        const folderPath = company.driveFolder +
-            (contragent.driveFolder ? '/' + contragent.driveFolder : '');
+        // Build a readable folder path for display
+        const companyFolderDisplay = company.driveFolder || 'Invoices';
+        const folderPath = contragent.driveFolder
+            ? `${companyFolderDisplay}/${contragent.driveFolder}`
+            : companyFolderDisplay;
         // Store the file in the proper folder
         const createdFile = targetFolder.createFile(pdf.setName(fileName));
-        // Show success message with the full path
+        const fileUrl = createdFile.getUrl();
+        // Log the invoice to the Invoice Log sheet
+        logInvoice(invoiceData.invoiceNumber, company.name, contragent.companyName, total, invoiceData.currency, fileName, fileUrl);
+        // Show success message with the full path and URL
         SpreadsheetApp.getUi().alert('Invoice has been generated successfully!\n\n' +
-            `Location: ${folderPath}/${fileName}`);
+            `Location: ${folderPath}/${fileName}\n\n` +
+            `Open file: ${fileUrl}`);
     }
     catch (error) {
         // Type guard for our custom error
