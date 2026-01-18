@@ -228,7 +228,7 @@
       </div>
       <? if (taxRate > 0) { ?>
       <div class="total-row">
-        <span>Tax (<?= taxRate ?>%)</span>
+        <span>Tax (<?= taxRate.toFixed(2) ?>%)</span>
         <span><?= currency ?> <?= taxAmount.toFixed(2) ?></span>
       </div>
       <? } ?>

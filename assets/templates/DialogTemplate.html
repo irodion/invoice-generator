@@ -197,8 +197,13 @@
     </form>
 
     <script>
-      // Track loading states
+      // Track loading states and errors
       var loadingState = {
+        companies: false,
+        contragents: false,
+        templates: false
+      };
+      var loadErrors = {
         companies: false,
         contragents: false,
         templates: false
@@ -233,14 +238,16 @@
       }
 
       function autoGenerateInvoiceNumber() {
+        // Use getNextInvoiceNumber for preview only - counter is incremented
+        // only when invoice is actually generated to avoid wasting numbers
         google.script.run
           .withSuccessHandler(function(number) {
             document.getElementById('invoiceNumber').value = number;
           })
           .withFailureHandler(function(error) {
-            alert('Error generating invoice number: ' + error);
+            alert('Error getting invoice number: ' + error);
           })
-          .generateInvoiceNumber();
+          .getNextInvoiceNumber();
       }
 
       function loadTemplatesData() {
@@ -253,7 +260,7 @@
           })
           .withFailureHandler(function(error) {
             loadingState.templates = false;
-            showError('templateSelect', 'templateError', 'Failed to load templates: ' + error);
+            showError('templateSelect', 'templateError', 'Failed to load templates: ' + error, 'templates');
             checkAllLoaded();
           })
           .getTemplatesList();
@@ -269,7 +276,7 @@
           })
           .withFailureHandler(function(error) {
             loadingState.companies = false;
-            showError('companySelect', 'companyError', 'Failed to load companies: ' + error);
+            showError('companySelect', 'companyError', 'Failed to load companies: ' + error, 'companies');
             checkAllLoaded();
           })
           .getCompanyData();
@@ -285,26 +292,30 @@
           })
           .withFailureHandler(function(error) {
             loadingState.contragents = false;
-            showError('contragentSelect', 'contragentError', 'Failed to load clients: ' + error);
+            showError('contragentSelect', 'contragentError', 'Failed to load clients: ' + error, 'contragents');
             checkAllLoaded();
           })
           .getContragentData();
       }
 
-      function showError(selectId, errorId, message) {
+      function showError(selectId, errorId, message, errorKey) {
         var select = document.getElementById(selectId);
         var errorDiv = document.getElementById(errorId);
         select.classList.add('error-state');
         select.innerHTML = '<option value="">Error loading data</option>';
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
+        if (errorKey) {
+          loadErrors[errorKey] = true;
+        }
       }
 
       function checkAllLoaded() {
-        // Enable submit button only when all data is loaded
+        // Enable submit button only when all data is loaded successfully (no errors)
         var allLoaded = !loadingState.companies && !loadingState.contragents && !loadingState.templates;
+        var hasErrors = loadErrors.companies || loadErrors.contragents || loadErrors.templates;
         var button = document.getElementById('generateButton');
-        button.disabled = !allLoaded;
+        button.disabled = !allLoaded || hasErrors;
       }
 
       function loadCompanies(companies) {
@@ -375,8 +386,8 @@
         var originalText = button.textContent;
 
         // Validate selections
-        var companyIndex = parseInt(document.getElementById('companySelect').value);
-        var contragentIndex = parseInt(document.getElementById('contragentSelect').value);
+        var companyIndex = parseInt(document.getElementById('companySelect').value, 10);
+        var contragentIndex = parseInt(document.getElementById('contragentSelect').value, 10);
 
         if (isNaN(companyIndex) || companyIndex < 0) {
           alert('Please select a company.');
@@ -398,7 +409,7 @@
           contragentIndex: contragentIndex,
           currency: document.getElementById('currencySelect').value,
           templateId: document.getElementById('templateSelect').value,
-          paymentDays: parseInt(document.getElementById('paymentTerms').value)
+          paymentDays: parseInt(document.getElementById('paymentTerms').value, 10)
         };
 
         google.script.run
