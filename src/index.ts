@@ -255,6 +255,20 @@ function getNextInvoiceNumber(): string {
 }
 
 /**
+ * Increments the invoice counter if the provided number matches the expected next auto-generated number.
+ * This ensures the counter is only incremented when an auto-generated number is actually used.
+ * @param invoiceNumber The invoice number being used
+ */
+function incrementCounterIfAutoNumber(invoiceNumber: string): void {
+  const expectedNext = getNextInvoiceNumber();
+  if (invoiceNumber === expectedNext) {
+    const props = PropertiesService.getDocumentProperties();
+    const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
+    props.setProperty('lastInvoiceNum', String(lastNum + 1));
+  }
+}
+
+/**
  * Logs a generated invoice to the Invoice Log sheet
  */
 function logInvoice(
@@ -446,6 +460,9 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
     const createdFile = targetFolder.createFile(pdf.setName(fileName));
     const fileUrl = createdFile.getUrl();
 
+    // Increment invoice counter if using auto-generated number
+    incrementCounterIfAutoNumber(invoiceData.invoiceNumber);
+
     // Log the invoice to the Invoice Log sheet
     logInvoice(
       invoiceData.invoiceNumber,
@@ -471,8 +488,7 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
       // Handle unknown errors
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
       SpreadsheetApp.getUi().alert('Error generating invoice: ' + errorMessage);
-      console.error('Invoice generation error:', error);
     }
-    throw error;
+    // Don't re-throw - alert already shown to user, re-throwing causes duplicate error in client
   }
 }

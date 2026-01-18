@@ -62,7 +62,7 @@
         <div class="total">
           <p>Subtotal: <?= currency ?> <?= subtotal.toFixed(2) ?></p>
           <? if (taxRate > 0) { ?>
-          <p>Tax (<?= taxRate ?>%): <?= currency ?> <?= taxAmount.toFixed(2) ?></p>
+          <p>Tax (<?= taxRate.toFixed(2) ?>%): <?= currency ?> <?= taxAmount.toFixed(2) ?></p>
           <? } ?>
           <p><strong>Total Amount: <?= currency ?> <?= total.toFixed(2) ?></strong></p>
         </div>
