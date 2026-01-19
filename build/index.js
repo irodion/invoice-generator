@@ -131,7 +131,84 @@ function safeGet(arr, index, defaultValue) {
 }
 function onOpen() {
     const ui = SpreadsheetApp.getUi();
-    ui.createMenu('Invoice Generator').addItem('Generate Invoice', 'showInvoiceDialog').addToUi();
+    ui.createMenu('Invoice Generator')
+        .addItem('Generate Invoice', 'showInvoiceDialog')
+        .addSeparator()
+        .addItem('Initialize Spreadsheet', 'initializeSpreadsheet')
+        .addToUi();
+}
+/**
+ * Initializes the spreadsheet with required sheets and headers
+ */
+function initializeSpreadsheet() {
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const ui = SpreadsheetApp.getUi();
+    // Confirm before initializing
+    const response = ui.alert('Initialize Spreadsheet', 'This will create/update the following sheets:\n' +
+        '• My Info (your company details)\n' +
+        '• Contragents (client details)\n\n' +
+        'Existing data will NOT be deleted. Continue?', ui.ButtonSet.YES_NO);
+    if (response !== ui.Button.YES) {
+        return;
+    }
+    // Initialize My Info sheet
+    let myInfoSheet = spreadsheet.getSheetByName('My Info');
+    if (!myInfoSheet) {
+        myInfoSheet = spreadsheet.insertSheet('My Info', 0);
+    }
+    initializeMyInfoSheet(myInfoSheet);
+    // Initialize Contragents sheet
+    let contragentsSheet = spreadsheet.getSheetByName('Contragents');
+    if (!contragentsSheet) {
+        contragentsSheet = spreadsheet.insertSheet('Contragents', 1);
+    }
+    initializeContragentsSheet(contragentsSheet);
+    ui.alert('Spreadsheet initialized successfully!\n\nPlease fill in your company info in "My Info" sheet and client details in "Contragents" sheet.');
+}
+function initializeMyInfoSheet(sheet) {
+    // Set headers if first row is empty
+    const firstRow = sheet.getRange(1, 1, 1, 6).getValues()[0];
+    if (!firstRow[0]) {
+        sheet.getRange(1, 1, 1, 6).setValues([[
+                'Company Name', 'Address', 'Email', 'Phone', 'Website', 'Google Drive Folder'
+            ]]);
+    }
+    // Format header row
+    const headerRange = sheet.getRange(1, 1, 1, 6);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+    sheet.setFrozenRows(1);
+    // Set column widths
+    sheet.setColumnWidth(1, 200); // Company Name
+    sheet.setColumnWidth(2, 250); // Address
+    sheet.setColumnWidth(3, 180); // Email
+    sheet.setColumnWidth(4, 120); // Phone
+    sheet.setColumnWidth(5, 150); // Website
+    sheet.setColumnWidth(6, 200); // Google Drive Folder
+}
+function initializeContragentsSheet(sheet) {
+    // Set headers if first row is empty
+    const firstRow = sheet.getRange(1, 1, 1, 9).getValues()[0];
+    if (!firstRow[0]) {
+        sheet.getRange(1, 1, 1, 9).setValues([[
+                'Company Name', 'Address', 'Email', 'Phone', 'Tax %', 'Contact Person', 'Notes', 'Currency', 'Google Drive Folder'
+            ]]);
+    }
+    // Format header row
+    const headerRange = sheet.getRange(1, 1, 1, 9);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f3f3f3');
+    sheet.setFrozenRows(1);
+    // Set column widths
+    sheet.setColumnWidth(1, 200); // Company Name
+    sheet.setColumnWidth(2, 250); // Address
+    sheet.setColumnWidth(3, 180); // Email
+    sheet.setColumnWidth(4, 120); // Phone
+    sheet.setColumnWidth(5, 70); // Tax %
+    sheet.setColumnWidth(6, 150); // Contact Person
+    sheet.setColumnWidth(7, 200); // Notes
+    sheet.setColumnWidth(8, 80); // Currency
+    sheet.setColumnWidth(9, 200); // Google Drive Folder
 }
 function showInvoiceDialog() {
     const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
