@@ -125,9 +125,9 @@ function sanitizeForSheet(value) {
     }
     return value;
 }
-// Safe array access helper
+// Safe array access helper - handles both null and undefined
 function safeGet(arr, index, defaultValue) {
-    return arr[index] !== undefined ? arr[index] : defaultValue;
+    return arr[index] != null ? arr[index] : defaultValue;
 }
 function onOpen() {
     const ui = SpreadsheetApp.getUi();
@@ -192,18 +192,6 @@ function cleanNameForFile(name) {
         .substring(0, 10);
 }
 /**
- * Generates a sequential invoice number in the format INV-YYYY-NNNN
- * @returns The generated invoice number
- */
-function generateInvoiceNumber() {
-    const props = PropertiesService.getDocumentProperties();
-    const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
-    const newNum = lastNum + 1;
-    props.setProperty('lastInvoiceNum', String(newNum));
-    const year = new Date().getFullYear();
-    return `INV-${year}-${String(newNum).padStart(4, '0')}`;
-}
-/**
  * Gets the next invoice number without incrementing the counter (for preview)
  * @returns The next invoice number that would be generated
  */
@@ -262,6 +250,8 @@ function logInvoice(invoiceNumber, companyName, clientName, total, currency, fil
         logSheet.setFrozenRows(1);
     }
     // Sanitize user-controlled strings to prevent formula injection
+    // Validate fileUrl is a legitimate Google Drive URL before logging unsanitized
+    const isValidDriveUrl = fileUrl.startsWith('https://drive.google.com/');
     logSheet.appendRow([
         new Date(),
         sanitizeForSheet(invoiceNumber),
@@ -270,7 +260,7 @@ function logInvoice(invoiceNumber, companyName, clientName, total, currency, fil
         total,
         sanitizeForSheet(currency),
         sanitizeForSheet(fileName),
-        fileUrl, // URLs are safe and need to remain clickable
+        isValidDriveUrl ? fileUrl : sanitizeForSheet(fileUrl),
     ]);
 }
 /**
