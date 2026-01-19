@@ -137,7 +137,7 @@ function showInvoiceDialog() {
     const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
         .evaluate()
         .setWidth(600)
-        .setHeight(500)
+        .setHeight(620)
         .setSandboxMode(HtmlService.SandboxMode.IFRAME);
     SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
 }
@@ -148,8 +148,8 @@ function showSuccessDialog(folderPath, fileName, fileUrl) {
     template.fileUrl = fileUrl;
     const html = template
         .evaluate()
-        .setWidth(400)
-        .setHeight(320)
+        .setWidth(450)
+        .setHeight(380)
         .setSandboxMode(HtmlService.SandboxMode.IFRAME);
     SpreadsheetApp.getUi().showModalDialog(html, 'Success');
 }
