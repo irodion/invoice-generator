@@ -169,9 +169,9 @@ function initializeMyInfoSheet(sheet) {
     // Set headers if first row is empty
     const firstRow = sheet.getRange(1, 1, 1, 6).getValues()[0];
     if (!firstRow[0]) {
-        sheet.getRange(1, 1, 1, 6).setValues([[
-                'Company Name', 'Address', 'Email', 'Phone', 'Website', 'Google Drive Folder'
-            ]]);
+        sheet
+            .getRange(1, 1, 1, 6)
+            .setValues([['Company Name', 'Address', 'Email', 'Phone', 'Website', 'Google Drive Folder']]);
     }
     // Format header row
     const headerRange = sheet.getRange(1, 1, 1, 6);
@@ -190,9 +190,21 @@ function initializeContragentsSheet(sheet) {
     // Set headers if first row is empty
     const firstRow = sheet.getRange(1, 1, 1, 9).getValues()[0];
     if (!firstRow[0]) {
-        sheet.getRange(1, 1, 1, 9).setValues([[
-                'Company Name', 'Address', 'Email', 'Phone', 'Tax %', 'Contact Person', 'Notes', 'Currency', 'Google Drive Folder'
-            ]]);
+        sheet
+            .getRange(1, 1, 1, 9)
+            .setValues([
+            [
+                'Company Name',
+                'Address',
+                'Email',
+                'Phone',
+                'Tax %',
+                'Contact Person',
+                'Notes',
+                'Currency',
+                'Google Drive Folder',
+            ],
+        ]);
     }
     // Format header row
     const headerRange = sheet.getRange(1, 1, 1, 9);
@@ -297,8 +309,10 @@ function getNextInvoiceNumber(companyIndex, contragentIndex) {
         if (companyIndex !== undefined && contragentIndex !== undefined) {
             const companies = getCompanyData();
             const contragents = getContragentData();
-            if (companyIndex >= 0 && companyIndex < companies.length &&
-                contragentIndex >= 0 && contragentIndex < contragents.length) {
+            if (companyIndex >= 0 &&
+                companyIndex < companies.length &&
+                contragentIndex >= 0 &&
+                contragentIndex < contragents.length) {
                 const company = companies[companyIndex];
                 const contragent = contragents[contragentIndex];
                 targetFolder = createNestedFolderStructure(company.driveFolder, contragent.driveFolder);

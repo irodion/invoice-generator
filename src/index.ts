@@ -234,16 +234,18 @@ function initializeSpreadsheet(): void {
   }
   initializeContragentsSheet(contragentsSheet);
 
-  ui.alert('Spreadsheet initialized successfully!\n\nPlease fill in your company info in "My Info" sheet and client details in "Contragents" sheet.');
+  ui.alert(
+    'Spreadsheet initialized successfully!\n\nPlease fill in your company info in "My Info" sheet and client details in "Contragents" sheet.'
+  );
 }
 
 function initializeMyInfoSheet(sheet: GoogleAppsScript.Spreadsheet.Sheet): void {
   // Set headers if first row is empty
   const firstRow = sheet.getRange(1, 1, 1, 6).getValues()[0];
   if (!firstRow[0]) {
-    sheet.getRange(1, 1, 1, 6).setValues([[
-      'Company Name', 'Address', 'Email', 'Phone', 'Website', 'Google Drive Folder'
-    ]]);
+    sheet
+      .getRange(1, 1, 1, 6)
+      .setValues([['Company Name', 'Address', 'Email', 'Phone', 'Website', 'Google Drive Folder']]);
   }
 
   // Format header row
@@ -265,9 +267,21 @@ function initializeContragentsSheet(sheet: GoogleAppsScript.Spreadsheet.Sheet): 
   // Set headers if first row is empty
   const firstRow = sheet.getRange(1, 1, 1, 9).getValues()[0];
   if (!firstRow[0]) {
-    sheet.getRange(1, 1, 1, 9).setValues([[
-      'Company Name', 'Address', 'Email', 'Phone', 'Tax %', 'Contact Person', 'Notes', 'Currency', 'Google Drive Folder'
-    ]]);
+    sheet
+      .getRange(1, 1, 1, 9)
+      .setValues([
+        [
+          'Company Name',
+          'Address',
+          'Email',
+          'Phone',
+          'Tax %',
+          'Contact Person',
+          'Notes',
+          'Currency',
+          'Google Drive Folder',
+        ],
+      ]);
   }
 
   // Format header row
@@ -281,10 +295,10 @@ function initializeContragentsSheet(sheet: GoogleAppsScript.Spreadsheet.Sheet): 
   sheet.setColumnWidth(2, 250); // Address
   sheet.setColumnWidth(3, 180); // Email
   sheet.setColumnWidth(4, 120); // Phone
-  sheet.setColumnWidth(5, 70);  // Tax %
+  sheet.setColumnWidth(5, 70); // Tax %
   sheet.setColumnWidth(6, 150); // Contact Person
   sheet.setColumnWidth(7, 200); // Notes
-  sheet.setColumnWidth(8, 80);  // Currency
+  sheet.setColumnWidth(8, 80); // Currency
   sheet.setColumnWidth(9, 200); // Google Drive Folder
 }
 
@@ -390,8 +404,12 @@ function getNextInvoiceNumber(companyIndex?: number, contragentIndex?: number): 
       const companies = getCompanyData();
       const contragents = getContragentData();
 
-      if (companyIndex >= 0 && companyIndex < companies.length &&
-          contragentIndex >= 0 && contragentIndex < contragents.length) {
+      if (
+        companyIndex >= 0 &&
+        companyIndex < companies.length &&
+        contragentIndex >= 0 &&
+        contragentIndex < contragents.length
+      ) {
         const company = companies[companyIndex];
         const contragent = contragents[contragentIndex];
         targetFolder = createNestedFolderStructure(company.driveFolder, contragent.driveFolder);
@@ -520,7 +538,10 @@ function getOrCreateFolder(
  * @param clientFolder The client folder name
  * @returns The nested folder where the invoice will be stored
  */
-function createNestedFolderStructure(companyFolder: string, clientFolder: string): GoogleAppsScript.Drive.Folder {
+function createNestedFolderStructure(
+  companyFolder: string,
+  clientFolder: string
+): GoogleAppsScript.Drive.Folder {
   // First create or get the company folder
   const companyFolderObj = getOrCreateFolder(companyFolder || 'Invoices');
 
@@ -551,7 +572,9 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
     const contragents = getContragentData();
 
     if (invoiceData.companyIndex < 0 || invoiceData.companyIndex >= companies.length) {
-      throw new InvoiceTypes.InvoiceError('Invalid company selected. Please refresh and try again.');
+      throw new InvoiceTypes.InvoiceError(
+        'Invalid company selected. Please refresh and try again.'
+      );
     }
     if (invoiceData.contragentIndex < 0 || invoiceData.contragentIndex >= contragents.length) {
       throw new InvoiceTypes.InvoiceError('Invalid client selected. Please refresh and try again.');
