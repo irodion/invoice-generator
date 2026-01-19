@@ -4,8 +4,8 @@
   "description": "A Google Apps Script project to generate invoices from Google Sheets data",
   "main": "build/index.js",
   "scripts": {
-    "build": "tsc && npm run copy-templates",
-    "copy-templates": "shx mkdir -p build/templates && shx cp -r assets/templates/* build/templates/",
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "shx mkdir -p build/templates && shx cp -r assets/templates/* build/templates/ && shx cp assets/appsscript.json build/",
     "watch": "tsc --watch",
     "start": "npm run watch",
     "push": "npm run build && clasp push",
