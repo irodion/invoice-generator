@@ -8,7 +8,8 @@
     },
     "plugins": [
       "@typescript-eslint",
-      "prettier"
+      "prettier",
+      "googleappsscript"
     ],
     "extends": [
       "eslint:recommended",
@@ -19,11 +20,13 @@
       "prettier/prettier": "error",
       "@typescript-eslint/explicit-function-return-type": "warn",
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-namespace": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { "varsIgnorePattern": "^(onOpen|showInvoiceDialog|generateInvoicePDF|getTemplatesList|getCompanyData|getContragentData|getNextInvoiceNumber)$" }],
       "no-console": ["warn", { "allow": ["warn", "error"] }]
     },
     "env": {
       "browser": true,
-      "googleappsscript/googleappsscript": true
+      "es6": true
     },
     "globals": {
       "GoogleAppsScript": "readonly",
@@ -35,7 +38,10 @@
       "FormApp": "readonly",
       "HtmlService": "readonly",
       "UrlFetchApp": "readonly",
-      "Utilities": "readonly"
+      "Utilities": "readonly",
+      "Session": "readonly",
+      "PropertiesService": "readonly",
+      "LockService": "readonly"
     }
   }
   
