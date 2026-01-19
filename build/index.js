@@ -137,7 +137,7 @@ function showInvoiceDialog() {
     const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
         .evaluate()
         .setWidth(600)
-        .setHeight(620)
+        .setHeight(520)
         .setSandboxMode(HtmlService.SandboxMode.IFRAME);
     SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
 }
