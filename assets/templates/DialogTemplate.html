@@ -219,27 +219,42 @@
         loadCompaniesData();
         loadContragentsData();
 
-        // Prefill suggested invoice number
-        loadNextInvoiceNumber();
+        // Add change listeners to update invoice number when company/client changes
+        document.getElementById('companySelect').addEventListener('change', updateInvoiceNumberFromFolder);
+        document.getElementById('contragentSelect').addEventListener('change', updateInvoiceNumberFromFolder);
       };
 
-      function loadNextInvoiceNumber() {
-        google.script.run
-          .withSuccessHandler(function(number) {
-            var input = document.getElementById('invoiceNumber');
-            if (!input.value) {
-              input.value = number;
-            }
-          })
-          .withFailureHandler(function() {
-            // Silent fail - user can enter manually
-          })
-          .getNextInvoiceNumber();
+      function updateInvoiceNumberFromFolder() {
+        var companyIndex = parseInt(document.getElementById('companySelect').value, 10);
+        var contragentIndex = parseInt(document.getElementById('contragentSelect').value, 10);
+
+        // Only update if both are selected
+        if (!isNaN(companyIndex) && companyIndex >= 0 && !isNaN(contragentIndex) && contragentIndex >= 0) {
+          google.script.run
+            .withSuccessHandler(function(number) {
+              document.getElementById('invoiceNumber').value = number;
+            })
+            .withFailureHandler(function() {
+              // Silent fail - user can enter manually
+            })
+            .getNextInvoiceNumber(companyIndex, contragentIndex);
+        }
       }
 
       function autoGenerateInvoiceNumber() {
-        // Use getNextInvoiceNumber for preview only - counter is incremented
-        // only when invoice is actually generated to avoid wasting numbers
+        // Get selected company and client to scan the correct folder
+        var companyIndex = parseInt(document.getElementById('companySelect').value, 10);
+        var contragentIndex = parseInt(document.getElementById('contragentSelect').value, 10);
+
+        if (isNaN(companyIndex) || companyIndex < 0) {
+          alert('Please select a company first.');
+          return;
+        }
+        if (isNaN(contragentIndex) || contragentIndex < 0) {
+          alert('Please select a client first.');
+          return;
+        }
+
         google.script.run
           .withSuccessHandler(function(number) {
             document.getElementById('invoiceNumber').value = number;
@@ -247,7 +262,7 @@
           .withFailureHandler(function(error) {
             alert('Error getting invoice number: ' + error);
           })
-          .getNextInvoiceNumber();
+          .getNextInvoiceNumber(companyIndex, contragentIndex);
       }
 
       function loadTemplatesData() {
@@ -316,6 +331,11 @@
         var hasErrors = loadErrors.companies || loadErrors.contragents || loadErrors.templates;
         var button = document.getElementById('generateButton');
         button.disabled = !allLoaded || hasErrors;
+
+        // Once all loaded, update invoice number based on selected folder
+        if (allLoaded && !hasErrors) {
+          updateInvoiceNumberFromFolder();
+        }
       }
 
       function loadCompanies(companies) {

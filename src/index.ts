@@ -195,7 +195,7 @@ function onOpen(): void {
   ui.createMenu('Invoice Generator').addItem('Generate Invoice', 'showInvoiceDialog').addToUi();
 }
 
-function showInvoiceDialog() {
+function showInvoiceDialog(): void {
   const html = HtmlService.createTemplateFromFile('templates/DialogTemplate')
     .evaluate()
     .setWidth(600)
@@ -205,6 +205,21 @@ function showInvoiceDialog() {
   SpreadsheetApp.getUi().showModalDialog(html, 'Generate Invoice');
 }
 
+function showSuccessDialog(folderPath: string, fileName: string, fileUrl: string): void {
+  const template = HtmlService.createTemplateFromFile('templates/SuccessDialog');
+  template.folderPath = escapeHtml(folderPath);
+  template.fileName = escapeHtml(fileName);
+  template.fileUrl = fileUrl;
+
+  const html = template
+    .evaluate()
+    .setWidth(400)
+    .setHeight(320)
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
+
+  SpreadsheetApp.getUi().showModalDialog(html, 'Success');
+}
+
 function getCompanyData(): InvoiceTypes.Company[] {
   const sheets = SpreadsheetApp.getActiveSpreadsheet().getSheets();
   const sheet = validateSheetExists(sheets, 0, 'Companies');
@@ -212,6 +227,7 @@ function getCompanyData(): InvoiceTypes.Company[] {
   const companies: InvoiceTypes.Company[] = [];
 
   // Skip header row - no escaping here, escape at render time only
+  // Column mapping (1-indexed): 1=Name, 2=Address, 3=Email, 4=Phone, 6=Google Drive
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (row[0]) {
@@ -221,7 +237,7 @@ function getCompanyData(): InvoiceTypes.Company[] {
         address: String(safeGet(row, 1, '')),
         email: String(safeGet(row, 2, '')),
         phone: String(safeGet(row, 3, '')),
-        driveFolder: String(safeGet(row, 4, '')),
+        driveFolder: String(safeGet(row, 5, '')), // Column 6 (index 5)
       });
     }
   }
@@ -236,6 +252,7 @@ function getContragentData(): InvoiceTypes.Contragent[] {
   const contragents: InvoiceTypes.Contragent[] = [];
 
   // Skip header row - no escaping here, escape at render time only
+  // Column mapping (1-indexed): 1=Name, 2=Address, 3=Email, 4=Phone, 5=Tax, 9=Google Drive Folder
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (row[0]) {
@@ -247,7 +264,7 @@ function getContragentData(): InvoiceTypes.Contragent[] {
         email: String(safeGet(row, 2, '')),
         phone: String(safeGet(row, 3, '')),
         tax: validateNumber(safeGet(row, 4, 0), `tax for ${companyName}`),
-        driveFolder: String(safeGet(row, 5, '')),
+        driveFolder: String(safeGet(row, 8, '')), // Column 9 (index 8)
       });
     }
   }
@@ -263,38 +280,62 @@ function cleanNameForFile(name: string): string {
 }
 
 /**
- * Gets the next invoice number without incrementing the counter (for preview)
- * @returns The next invoice number that would be generated
+ * Gets the next invoice number by scanning the target folder for existing invoices.
+ * Falls back to a default if no company/client selected or folder doesn't exist.
+ * @param companyIndex Optional company index to determine target folder
+ * @param contragentIndex Optional client index to determine target subfolder
+ * @returns The next invoice number based on existing files in the folder
  */
-function getNextInvoiceNumber(): string {
-  const props = PropertiesService.getDocumentProperties();
-  const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
-  const nextNum = lastNum + 1;
+function getNextInvoiceNumber(companyIndex?: number, contragentIndex?: number): string {
   const year = new Date().getFullYear();
-  return `INV-${year}-${String(nextNum).padStart(4, '0')}`;
-}
 
-/**
- * Increments the invoice counter if the provided number matches the expected next auto-generated number.
- * This ensures the counter is only incremented when an auto-generated number is actually used.
- * Uses LockService to prevent race conditions with concurrent users.
- * @param invoiceNumber The invoice number being used
- */
-function incrementCounterIfAutoNumber(invoiceNumber: string): void {
-  const lock = LockService.getDocumentLock();
   try {
-    // Wait up to 10 seconds for the lock
-    lock.waitLock(10000);
+    // Get folder path if indices provided
+    let targetFolder: GoogleAppsScript.Drive.Folder | null = null;
 
-    // Re-check after acquiring lock (another user may have incremented)
-    const expectedNext = getNextInvoiceNumber();
-    if (invoiceNumber === expectedNext) {
-      const props = PropertiesService.getDocumentProperties();
-      const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
-      props.setProperty('lastInvoiceNum', String(lastNum + 1));
+    if (companyIndex !== undefined && contragentIndex !== undefined) {
+      const companies = getCompanyData();
+      const contragents = getContragentData();
+
+      if (companyIndex >= 0 && companyIndex < companies.length &&
+          contragentIndex >= 0 && contragentIndex < contragents.length) {
+        const company = companies[companyIndex];
+        const contragent = contragents[contragentIndex];
+        targetFolder = createNestedFolderStructure(company.driveFolder, contragent.driveFolder);
+      }
     }
-  } finally {
-    lock.releaseLock();
+
+    if (!targetFolder) {
+      // Fallback: return INV-YYYY-0001 if no folder context
+      return `INV-${year}-0001`;
+    }
+
+    // Scan folder for existing invoice files
+    const files = targetFolder.getFiles();
+    let maxNumber = 0;
+
+    while (files.hasNext()) {
+      const file = files.next();
+      const fileName = file.getName();
+
+      // Match invoice number pattern: INV-YYYY-NNNN
+      const match = fileName.match(/INV-(\d{4})-(\d{4})/);
+      if (match) {
+        const fileYear = parseInt(match[1], 10);
+        const fileNum = parseInt(match[2], 10);
+
+        // Only consider invoices from current year or find max across all years
+        if (fileYear === year && fileNum > maxNumber) {
+          maxNumber = fileNum;
+        }
+      }
+    }
+
+    const nextNum = maxNumber + 1;
+    return `INV-${year}-${String(nextNum).padStart(4, '0')}`;
+  } catch (error) {
+    // On any error, return a safe default
+    return `INV-${year}-0001`;
   }
 }
 
@@ -494,9 +535,6 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
     const createdFile = targetFolder.createFile(pdf.setName(fileName));
     const fileUrl = createdFile.getUrl();
 
-    // Increment invoice counter if using auto-generated number
-    incrementCounterIfAutoNumber(invoiceData.invoiceNumber);
-
     // Log the invoice to the Invoice Log sheet
     logInvoice(
       invoiceData.invoiceNumber,
@@ -508,12 +546,8 @@ function generateInvoicePDF(invoiceData: InvoiceTypes.InvoiceData): void {
       fileUrl
     );
 
-    // Show success message with the full path and URL
-    SpreadsheetApp.getUi().alert(
-      'Invoice has been generated successfully!\n\n' +
-        `Location: ${folderPath}/${fileName}\n\n` +
-        `Open file: ${fileUrl}`
-    );
+    // Show success dialog with clickable link
+    showSuccessDialog(folderPath, fileName, fileUrl);
   } catch (error) {
     // Type guard for our custom error
     if (error instanceof InvoiceTypes.InvoiceError) {
