@@ -94,6 +94,37 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
+// Create HTML-escaped version of company for template rendering
+function escapeCompanyForTemplate(company) {
+    return {
+        name: escapeHtml(company.name),
+        address: escapeHtml(company.address),
+        email: escapeHtml(company.email),
+        phone: escapeHtml(company.phone),
+        driveFolder: company.driveFolder, // Not rendered in template
+    };
+}
+// Create HTML-escaped version of contragent for template rendering
+function escapeContragentForTemplate(contragent) {
+    return {
+        companyName: escapeHtml(contragent.companyName),
+        address: escapeHtml(contragent.address),
+        email: escapeHtml(contragent.email),
+        phone: escapeHtml(contragent.phone),
+        tax: contragent.tax,
+        driveFolder: contragent.driveFolder, // Not rendered in template
+    };
+}
+// Sanitize value to prevent spreadsheet formula injection
+function sanitizeForSheet(value) {
+    if (typeof value !== 'string')
+        return value;
+    // Prefix with single quote if value starts with formula-triggering characters
+    if (/^[=+\-@\t\r]/.test(value)) {
+        return "'" + value;
+    }
+    return value;
+}
 // Safe array access helper
 function safeGet(arr, index, defaultValue) {
     return arr[index] !== undefined ? arr[index] : defaultValue;
@@ -115,16 +146,16 @@ function getCompanyData() {
     const sheet = validateSheetExists(sheets, 0, 'Companies');
     const data = sheet.getDataRange().getValues();
     const companies = [];
-    // Skip header row
+    // Skip header row - no escaping here, escape at render time only
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (row[0]) {
             // If name exists
             companies.push({
-                name: escapeHtml(String(safeGet(row, 0, ''))),
-                address: escapeHtml(String(safeGet(row, 1, ''))),
-                email: escapeHtml(String(safeGet(row, 2, ''))),
-                phone: escapeHtml(String(safeGet(row, 3, ''))),
+                name: String(safeGet(row, 0, '')),
+                address: String(safeGet(row, 1, '')),
+                email: String(safeGet(row, 2, '')),
+                phone: String(safeGet(row, 3, '')),
                 driveFolder: String(safeGet(row, 4, '')),
             });
         }
@@ -136,17 +167,17 @@ function getContragentData() {
     const sheet = validateSheetExists(sheets, 1, 'Clients');
     const data = sheet.getDataRange().getValues();
     const contragents = [];
-    // Skip header row
+    // Skip header row - no escaping here, escape at render time only
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         if (row[0]) {
             // If company name exists
             const companyName = String(safeGet(row, 0, ''));
             contragents.push({
-                companyName: escapeHtml(companyName),
-                address: escapeHtml(String(safeGet(row, 1, ''))),
-                email: escapeHtml(String(safeGet(row, 2, ''))),
-                phone: escapeHtml(String(safeGet(row, 3, ''))),
+                companyName: companyName,
+                address: String(safeGet(row, 1, '')),
+                email: String(safeGet(row, 2, '')),
+                phone: String(safeGet(row, 3, '')),
                 tax: validateNumber(safeGet(row, 4, 0), `tax for ${companyName}`),
                 driveFolder: String(safeGet(row, 5, '')),
             });
@@ -186,14 +217,24 @@ function getNextInvoiceNumber() {
 /**
  * Increments the invoice counter if the provided number matches the expected next auto-generated number.
  * This ensures the counter is only incremented when an auto-generated number is actually used.
+ * Uses LockService to prevent race conditions with concurrent users.
  * @param invoiceNumber The invoice number being used
  */
 function incrementCounterIfAutoNumber(invoiceNumber) {
-    const expectedNext = getNextInvoiceNumber();
-    if (invoiceNumber === expectedNext) {
-        const props = PropertiesService.getDocumentProperties();
-        const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
-        props.setProperty('lastInvoiceNum', String(lastNum + 1));
+    const lock = LockService.getDocumentLock();
+    try {
+        // Wait up to 10 seconds for the lock
+        lock.waitLock(10000);
+        // Re-check after acquiring lock (another user may have incremented)
+        const expectedNext = getNextInvoiceNumber();
+        if (invoiceNumber === expectedNext) {
+            const props = PropertiesService.getDocumentProperties();
+            const lastNum = parseInt(props.getProperty('lastInvoiceNum') || '0', 10);
+            props.setProperty('lastInvoiceNum', String(lastNum + 1));
+        }
+    }
+    finally {
+        lock.releaseLock();
     }
 }
 /**
@@ -220,15 +261,16 @@ function logInvoice(invoiceNumber, companyName, clientName, total, currency, fil
         headerRange.setBackground('#f3f3f3');
         logSheet.setFrozenRows(1);
     }
+    // Sanitize user-controlled strings to prevent formula injection
     logSheet.appendRow([
         new Date(),
-        invoiceNumber,
-        companyName,
-        clientName,
+        sanitizeForSheet(invoiceNumber),
+        sanitizeForSheet(companyName),
+        sanitizeForSheet(clientName),
         total,
-        currency,
-        fileName,
-        fileUrl,
+        sanitizeForSheet(currency),
+        sanitizeForSheet(fileName),
+        fileUrl, // URLs are safe and need to remain clickable
     ]);
 }
 /**
@@ -321,10 +363,10 @@ function generateInvoicePDF(invoiceData) {
         const taxRate = contragent.tax || 0;
         const taxAmount = (subtotal * taxRate) / 100;
         const total = subtotal + taxAmount;
-        // Set template variables
+        // Set template variables - use escaped versions for HTML rendering
         Object.assign(template, {
-            company,
-            contragent,
+            company: escapeCompanyForTemplate(company),
+            contragent: escapeContragentForTemplate(contragent),
             invoiceNumber: escapeHtml(invoiceData.invoiceNumber),
             currentDate: Utilities.formatDate(currentDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
             dueDate: Utilities.formatDate(dueDate, Session.getScriptTimeZone(), 'MMMM dd, yyyy'),
