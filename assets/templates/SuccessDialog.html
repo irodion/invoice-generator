@@ -66,6 +66,15 @@
       <p><strong>File:</strong> <?= fileName ?></p>
     </div>
     <a href="<?= fileUrl ?>" target="_blank" class="open-btn">Open Invoice</a>
-    <button class="close-btn" onclick="google.script.host.close()">Close</button>
+    <button class="close-btn" onclick="google.script.host.close()">Close (Esc)</button>
+
+    <script>
+      // Close dialog on Esc key press
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          google.script.host.close();
+        }
+      });
+    </script>
   </body>
 </html>
