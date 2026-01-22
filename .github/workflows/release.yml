@@ -25,18 +25,37 @@ jobs:
     steps:
       # Check out the repository code
       - name: Checkout code
-        uses: actions/checkout@v3
-      
+        uses: actions/checkout@v4
+
       # Set up Node.js environment
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
-          
+          cache: 'npm'
+
       # Install dependencies
       - name: Install dependencies
         run: npm ci
-      
+
+      # Run security scan with vet before building
+      - name: Security scan with vet
+        uses: safedep/vet-action@v1
+        with:
+          policy: |
+            name: release-policy
+            rules:
+              - name: block-critical-vulns
+                filter: |
+                  vulns.critical.exists(v, true)
+                action: deny
+                message: "Package has critical vulnerabilities - blocking release"
+              - name: block-malware
+                filter: |
+                  pkg.malicious == true
+                action: deny
+                message: "Package is flagged as malicious - blocking release"
+
       # Build the project (if needed)
       - name: Build project
         run: npm run build

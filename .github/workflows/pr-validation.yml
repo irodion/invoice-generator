@@ -1,0 +1,81 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Run tests
+        run: npm test
+
+  security-scan:
+    name: Security Scan (vet)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run vet security scan
+        uses: safedep/vet-action@v1
+        with:
+          # Fail on critical vulnerabilities
+          policy: |
+            name: default
+            rules:
+              - name: block-critical-vulns
+                filter: |
+                  vulns.critical.exists(v, true)
+                action: deny
+                message: "Package has critical vulnerabilities"
+              - name: block-high-vulns
+                filter: |
+                  vulns.high.exists(v, true)
+                action: warn
+                message: "Package has high severity vulnerabilities"
+              - name: block-malware
+                filter: |
+                  pkg.malicious == true
+                action: deny
+                message: "Package is flagged as malicious"
