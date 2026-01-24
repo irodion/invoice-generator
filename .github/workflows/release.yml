@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  security-events: write
 
 jobs:
   build-and-release:
@@ -32,6 +33,7 @@ jobs:
       - name: Security scan with vet
         uses: safedep/vet-action@59b31472804fb53a689468e856c65bdfb84275b3 # v1
         with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           policy: |
             name: release-policy
             rules:

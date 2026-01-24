@@ -9,6 +9,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  security-events: write
 
 jobs:
   security-scan:
@@ -24,7 +25,7 @@ jobs:
       - name: Run vet security scan
         uses: safedep/vet-action@59b31472804fb53a689468e856c65bdfb84275b3 # v1
         with:
-          # Fail on critical vulnerabilities
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           policy: |
             name: default
             rules:
